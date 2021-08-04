@@ -1,0 +1,12 @@
+[Unit]
+Description=Enable THP
+
+[Service]
+Type=oneshot
+ExecStart=/home/max/scripts/thp-enable.sh
+
+[Install]
+WantedBy=basic.target
+
+# sudo cp /home/max/scripts/thp-enable.service /etc/systemd/system/
+# sudo systemctl enable thp-enable.service
