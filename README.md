@@ -14,6 +14,8 @@ $ sudo cp --preserve=all $(readlink -f $(which python)){,.$(date +%Y%m%dT%H%M%S)
 $ sudo patchelf --add-needed /usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so $(readlink -f $(which python))
 ```
 
+My use case is machine learning using Ray Tune and PyTorch on CPU, and above change results in 5-15% faster machine learning with no code changes. Your results may differ, benchmark your application before and after applying the above change.
+
 ## Example output
 
 ```
