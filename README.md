@@ -1,7 +1,20 @@
 # thp-usage
 A script to show processes that use transparent huge pages on Linux.
 
-## Example
+## Setup
+### Enable transparent huge pages on your system
+```
+$ sudo ./install-thp-always.sh
+```
+
+### Make Python always use transparent huge pages for memory allocations by using huge page aware [tcmalloc][1]
+```
+$ sudo apt-get --yes install libgoogle-perftools-dev patchelf
+$ sudo cp --preserve=all $(readlink -f $(which python)){,.$(date +%Y%m%dT%H%M%S)~}
+$ sudo patchelf --add-needed /usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so $(readlink -f $(which python))
+```
+
+## Example output
 
 ```
 $ sudo ./thp-usage.py
@@ -68,3 +81,5 @@ $ sudo ./thp-usage.py
 ---
 
 Copyright (c) 2021 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
+
+[1]: https://google.github.io/tcmalloc/temeraire.html
