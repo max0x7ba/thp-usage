@@ -80,6 +80,38 @@ $ sudo ./thp-usage.py
       0	  24,884	      49,768	<total>
 ```
 
+To find out what huges pages are used for in a process, the following command can be used:
+
+```
+$ grep -A10 -B13 "^AnonHugePages:[[:space:]]*[1-9]" /proc/670988/smaps
+55c49328c000-55c493f05000 rw-p 00000000 00:00 0                          [heap]
+Size:              12772 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:               11508 kB
+Pss:               11508 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:     11508 kB
+Referenced:        11508 kB
+Anonymous:         11508 kB
+LazyFree:              0 kB
+AnonHugePages:      8192 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:    1
+ProtectionKey:         0
+VmFlags: rd wr mr mw me ac sd
+```
+
+In the above command, `-A` and `-B` parameters match `smaps` format of Linux-5.10. If the format is different on your system, you may like to adjust these parameters appropriately.
+
 ---
 
 Copyright (c) 2021 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
