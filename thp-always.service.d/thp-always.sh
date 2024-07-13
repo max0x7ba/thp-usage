@@ -10,5 +10,10 @@ echo defer+madvise > /sys/kernel/mm/transparent_hugepage/defrag
 echo 0 > /sys/kernel/mm/transparent_hugepage/khugepaged/max_ptes_none
 echo 1 > /proc/sys/vm/overcommit_memory
 
-max_ptes_shared=/sys/kernel/mm/transparent_hugepage/khugepaged/max_ptes_shared
-echo $(($(cat $max_ptes_shared) * 2 - 1)) > $max_ptes_shared
+readonly max_ptes_shared_original=/run/max_ptes_shared.original.txt
+if [[ ! -f $max_ptes_shared_original ]]; then
+    readonly max_ptes_shared=/sys/kernel/mm/transparent_hugepage/khugepaged/max_ptes_shared
+    declare -ri original_value=$(cat $max_ptes_shared)
+    echo "$((original_value * 2 - 1))" > $max_ptes_shared
+    echo "$original_value" > $max_ptes_shared_original
+fi
