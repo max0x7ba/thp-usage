@@ -1,22 +1,97 @@
 # thp-usage
-A script to show processes that use transparent huge pages on Linux.
+Default Linux THP settings maximize compatibility at the expense of performance in order to avoid regressing benchmarks of several popular databases failing to adopt THP and taking a massive performance hit when THP is always enabled.
 
-## Setup
-### Enable transparent huge pages on your system
+Maximising performance benefits enabled by THP, on the other hand, requires THP to be always enabled and have immediate effect on any memory allocations. This project provides settings that uncripple, unleash and maximize the positive effects of THP on performance  These should have been the default THP settings for everyone..
+
+The following utilities help measure and appreciate the effects of uncrippling performance of THP:
+
+* `thp-meminfo` reports accurate totals of physical RAM page frames usage by the entire system including huge page usage.
+* `thp-usage` reports what processes use how many transparent huge page frames of RAM.
+
+
+# Setup
+
+## Enable transparent huge pages on your system
+The default THP configuration in Linux distros is rather sub-optimal to avoid regressing Linux distro benchmarks of several popular databases failing to adopt THP and taking a massive performance hit when THP is always enabled.
+
+Few Linux users ever care, install or run.these popular databases. The default THP settings for legacy compatibility cripple THP performance benefits for every user.
+
+These settings uncripple and maximize the positive effects of THP on performance. These should have been the default THP settings for everyone.
+
 ```
 $ sudo ./install-thp-always.sh
 ```
 
-### Make Python always use transparent huge pages for memory allocations by using huge page aware [tcmalloc][1]
+# thp-meminfo
+thp-meminfo reports accurate totals of physical RAM page frames used by the entire system.
+
+## thp-meminfo example output
 ```
-$ sudo apt-get --yes install libgoogle-perftools-dev patchelf
-$ sudo cp --preserve=all $(readlink -f $(which python)){,.$(date +%Y%m%dT%H%M%S)~}
-$ sudo patchelf --add-needed /usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so $(readlink -f $(which python))
+$ ./thp-meminfo.sh
+                  max_ptes_none:          64
+                max_ptes_shared:          64
+                  max_ptes_swap:           0
+           scan_sleep_millisecs:      10,000
+                  pages_to_scan:       4,096
+                     full_scans:           2
+                pages_collapsed:         793
+
+                       MemTotal: 131,820,388 kB
+                        MemFree: 117,469,332 kB
+                   MemAvailable: 124,435,856 kB
+                  AnonHugePages:   1,517,568 kB
+                 ShmemHugePages:       2,048 kB
+                 ShmemPmdMapped:           0 kB
+                  FileHugePages:           0 kB
+                  FilePmdMapped:           0 kB
+
+             nr_shmem_hugepages:           1
+              nr_file_hugepages:           0
+  nr_anon_transparent_hugepages:         741
+            pgdemote_khugepaged:           0
+             pgsteal_khugepaged:           0
+              pgscan_khugepaged:           0
+          numa_huge_pte_updates:          31
+          thp_migration_success:           0
+             thp_migration_fail:           0
+            thp_migration_split:           0
+                thp_fault_alloc:       8,837
+             thp_fault_fallback:           0
+      thp_fault_fallback_charge:           0
+             thp_collapse_alloc:         793
+      thp_collapse_alloc_failed:           0
+                 thp_file_alloc:           1
+              thp_file_fallback:           0
+       thp_file_fallback_charge:           0
+                thp_file_mapped:           0
+                 thp_split_page:           0
+          thp_split_page_failed:           0
+        thp_deferred_split_page:         698
+                  thp_split_pmd:       1,014
+       thp_scan_exceed_none_pte:       1,383
+       thp_scan_exceed_swap_pte:           0
+      thp_scan_exceed_share_pte:           0
+                  thp_split_pud:           0
+            thp_zero_page_alloc:           1
+     thp_zero_page_alloc_failed:           0
+                     thp_swpout:           0
+            thp_swpout_fallback:           0
 ```
 
+`thp_fault_alloc` counts immediately allocated THP.
+
+`thp_collapse_alloc` counts THP.collapsed by `khugepaged` at some indeterminate later time.
+
+The ideal is to maximize `thp_fault_alloc` and minimize `thp_collapse_alloc`.
+
+# thp-usage
+thp-usage reports what processes use how many transparent huge page frames of RAM. Reading these metrics from /proc/*/smaps of all processes is what requires the root privilege.
+
+The totals row is a simple sum of per-process metrics. Same THP page frames of RAM shared by multiple processes get summed more than once.
+
+## thp-usage example output
 My use case is machine learning using Ray Tune and PyTorch on CPU, and above change results in 5-15% faster machine learning with no code changes. Your results may differ, benchmark your application before and after applying the above change.
 
-## Example output
 
 ```
 $ sudo ./thp-usage.py
@@ -115,5 +190,3 @@ In the above command, `-A` and `-B` parameters match `smaps` format of Linux-5.1
 ---
 
 Copyright (c) 2021 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
-
-[1]: https://google.github.io/tcmalloc/temeraire.html
