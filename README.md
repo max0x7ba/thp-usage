@@ -1,7 +1,7 @@
 # thp-usage
 Default Linux THP settings maximize compatibility at the expense of performance in order to avoid regressing benchmarks of several popular databases failing to adopt THP and taking a massive performance hit when THP is always enabled.
 
-Maximising performance benefits enabled by THP, on the other hand, requires THP to be always enabled and have immediate effect on any memory allocations. This project provides settings that uncripple, unleash and maximize the positive effects of THP on performance  These should have been the default THP settings for everyone..
+Maximising performance benefits enabled by THP, on the other hand, requires THP to be always enabled and have immediate effect on any memory allocations. This project provides settings that uncripple, unleash and maximize the positive effects of THP on performance. These should have been the default THP settings for everyone..
 
 The following utilities help measure and appreciate the effects of uncrippling performance of THP:
 
@@ -80,7 +80,7 @@ $ ./thp-meminfo.sh
 
 `thp_fault_alloc` counts immediately allocated THP.
 
-`thp_collapse_alloc` counts THP.collapsed by `khugepaged` at some indeterminate later time.
+`thp_collapse_alloc` counts THP collapsed by `khugepaged` at some later indeterminate time.
 
 The ideal is to maximize `thp_fault_alloc` and minimize `thp_collapse_alloc`.
 
