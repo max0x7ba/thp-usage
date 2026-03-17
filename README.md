@@ -1,6 +1,8 @@
 # thp-usage
 Default Linux transparent huge pages (THP) settings maximize compatibility at the expense of performance in order to avoid regressing benchmarks of several popular databases failing to adopt THP and suffering a performance hit when THP is always enabled.
 
+Few Linux users care or ever install and run those databases at all.
+
 Maximising performance benefits of THP, on the other hand, requires THP to be always enabled and have immediate effect on any memory allocations. 
 
 This project provides settings that uncripple, unleash and maximize the positive effects of THP on performance. These should have been the default THP settings for everyone.
@@ -15,8 +17,6 @@ The following utilities help measure and appreciate the effects of uncrippling p
 
 ## Enable transparent huge pages on your system
 The default THP configuration in Linux distros is rather sub-optimal.
-
-Few Linux users ever care, install or run these popular databases. The default THP settings for legacy compatibility cripple THP performance benefits for every user.
 
 These settings uncripple and maximize the positive effects of THP on performance. These should have been the default THP settings for everyone.
 
