@@ -31,7 +31,7 @@ Only databases (and similar tail-latency-sensitive services) are consistently hu
 * Synchronous compaction stalls hurting per-request or per-operation latency (databases, web servers with dynamic allocations, some game servers).
 * Fork latency during background snapshots / persistence (Redis BGSAVE, PostgreSQL checkpoints, MongoDB WiredTiger snapshots) — because fork needs to split huge pages, which can be slow under high memory pressure.
 
-Despite the reality:
+While the ground reality is different:
 * These databases are not default-installed software on desktop or workstation Linux distributions.
 * The vast majority of Linux users (developers, data scientists, quant researchers, gamers, home servers, etc.) never run any of them.
 * For the large class of batch/ML/quant/HPC workloads, aggressive THP (`always + defrag=always + tuned khugepaged`) is not only reasonable - it's often one of the highest-ROI single tuning knobs available on modern Linux (especially on recent kernels with improved compaction heuristics).
@@ -49,7 +49,7 @@ Linux distro default THP configuration is sub-optimal for compute-heavy workload
 * One sole low priority `khugepaged` kernel thread scans virtual memory areas (VMAs) of processes, scanning up to 16MB of eligible VMAs every 10 seconds, by default. Takes ~23 hours for `khugepaged` to scan 128GB of VMAs to collapse contiguous regions of 4kB pages into 2MB huge pages.
 * Its THP speed-ups are only measurable in long-running processes (like ANN training), but not in quick/micro benchmarks.
 
-This THP configuration, on the other hand, improves and maximises performance benefits of THP with immediate effect for compute-heavy workloads. It specifically seeks to undo or change any THP settings conflicting with the stated goal. Such as settings designed to limit memory allocation latency spikes or CPU bursts for databases or general-purpose software. It enables synchronous compaction precisely to minimize run-time of compute-heavy workloads with multi-MB datasets.
+This THP configuration, on the other hand, improves and maximises performance benefits of THP with immediate effect for compute-heavy workloads. It specifically seeks to undo or change any THP settings conflicting with the stated goal. Such as settings designed to limit memory allocation latency spikes or CPU bursts for databases. It enables synchronous compaction precisely to minimize run-time of compute-heavy workloads with multi-MB datasets.
 
 In addition to minimizing the run-time of compute-heavy workloads, the effect of this THP configuration is also immediately noticeable and measurable as at least 5% shorter run-time in all existing timed runs of relatively short-lived processes completing within seconds, such as benchmarks, parallel builds and unit-tests. Unaffected by always enabled THP in the kernel command line alone.
 
