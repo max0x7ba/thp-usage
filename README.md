@@ -1,5 +1,5 @@
 # thp-usage
-Provides utilities to help assessing and measuring effects of Linux transparent huge pages: Along with THP settings to minimize run-time of compute-heavy workloads.
+Provides utilities to help assessing and measuring effects of Linux transparent huge pages. Along with THP settings to minimize run-time of compute-heavy workloads.
 
 ## Utilities
 
