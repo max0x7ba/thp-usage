@@ -6,7 +6,38 @@ Provides utilities to help assessing and measuring effects of Linux transparent 
 * `thp-meminfo` reports accurate totals of physical RAM page frames usage by the entire system including huge page usage.
 * `thp-usage` reports what processes use how many transparent huge page frames of RAM.
 
-## THP settings for compute-heavy workloads
+## THP settings
+Linux default THP configuration cripples THP performance badly for all applications other than databases.
+
+This is a global perversion hurting every Linux user to comfort the few corporations selling the databases and associated services.
+
+### The "THP = bad" narrative is heavily database-centric.
+
+The overwhelming majority of public warnings, kernel documentation footnotes, distro tuning guides, and forum threads that say "disable THP" or "set defrag=never/madvise" come from exactly one cluster of applications:
+
+* Redis
+* PostgreSQL
+* MySQL / MariaDB
+* MongoDB
+* Oracle DB
+* some key-value stores / caches (Memcached, Aerospike, etc.)
+* certain JVM-based services when running latency-sensitive workloads
+
+These are the voices that have been loudest for ~10–15 years on this topic. Their tuning recommendations (often "never" or "defer+madvise") have been copied into countless blog posts, Ansible roles, cloud provider defaults, and even some kernel config fragments. That creates a strong impression that THP is broadly problematic.
+
+Only databases (and similar tail-latency-sensitive services) are consistently hurt by aggressive THP. Almost all documented regressions from `defrag=always` / `enabled=always` fall into two categories:
+* Synchronous compaction stalls hurting per-request or per-operation latency (databases, web servers with dynamic allocations, some game servers).
+* Fork latency during background snapshots / persistence (Redis BGSAVE, PostgreSQL checkpoints, MongoDB WiredTiger snapshots) — because fork needs to split huge pages, which can be slow under high memory pressure.
+
+Despite the reality:
+* These databases are not default-installed software on desktop or workstation Linux distributions.
+* The vast majority of Linux users (developers, data scientists, quant researchers, gamers, home servers, etc.) never run any of them.
+* For the large class of batch/ML/quant/HPC workloads, aggressive THP (`always + defrag=always + tuned khugepaged`) is not only reasonable - it's often one of the highest-ROI single tuning knobs available on modern Linux (especially on recent kernels with improved compaction heuristics).
+* The database-centric "disable THP" advice is actively harmful when blindly applied to throughput-oriented code.
+
+### THP settings for compute-heavy workloads
+
+This configuration is the opposite extreme of the conservative settings recommended for databases and tail-latency-sensitive services. Those recommendations cripple THP benefits for compute-heavy batch workloads like the ones targeted here.
 
 The goal of this THP configuration is to minimize run-time of compute-heavy workloads with multi-MB datasets in multi-CPU systems with plenty of RAM, no NUMA and no swap disks. With datasets accessed in sequential fashion using aligned avx2 or wider load and store instructions, with loads and stores being the main bottleneck.
 
