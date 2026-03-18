@@ -101,9 +101,9 @@ thp-meminfo reports accurate totals of physical RAM page frames used by the enti
              nr_shmem_hugepages:           1
               nr_file_hugepages:           0
   nr_anon_transparent_hugepages:         741
-            pgdemote_`khugepaged`:           0
-             pgsteal_`khugepaged`:           0
-              pgscan_`khugepaged`:           0
+            pgdemote_khugepaged:           0
+             pgsteal_khugepaged:           0
+              pgscan_khugepaged:           0
           numa_huge_pte_updates:          31
           thp_migration_success:           0
              thp_migration_fail:           0
@@ -233,7 +233,7 @@ Private_Hugetlb:       0 kB
 Swap:                  0 kB
 SwapPss:               0 kB
 Locked:                0 kB
-THPeligible:    1
+THPeligible:           1
 ProtectionKey:         0
 VmFlags: rd wr mr mw me ac sd
 ```
