@@ -1,30 +1,48 @@
 # thp-usage
-Default Linux transparent huge pages (THP) settings maximize compatibility at the expense of performance in order to avoid regressing benchmarks of several popular databases failing to adopt THP and suffering a performance hit when THP is always enabled.
+Provides utilities to help assessing and measuring effects of Linux transparent huge pages: Along with THP settings to minimize run-time of compute-heavy workloads.
 
-Few Linux users care or ever install and run those databases at all.
-
-Maximising performance benefits of THP, on the other hand, requires THP to be always enabled and have immediate effect on any memory allocations. 
-
-This project provides settings that uncripple, unleash and maximize the positive effects of THP on performance. These should have been the default THP settings for everyone.
-
-The following utilities help measure and appreciate the effects of uncrippling performance of THP:
+## Utilities
 
 * `thp-meminfo` reports accurate totals of physical RAM page frames usage by the entire system including huge page usage.
 * `thp-usage` reports what processes use how many transparent huge page frames of RAM.
 
+## THP settings for compute-heavy workloads
+
+The goal of this THP configuration is to minimize run-time of compute-heavy workloads with multi-MB datasets in multi-CPU systems with plenty of RAM, no NUMA and no swap disks. With datasets accessed in sequential fashion using aligned avx2 or wider load and store instructions, with loads and stores being the main bottleneck.
+
+Linux distro default THP configuration is sub-optimal for compute-heavy workloads because:
+
+* It postpones and delegates allocating huge pages to `khugepaged` kernel thread sometime in the future, when there are no huge pages immediately available to fulfil an allocation request. No huge pages available is the default and expected state.
+* One sole low priority `khugepaged` kernel thread scans virtual memory areas (VMAs) of processes, scanning up to 16MB of eligible VMAs every 10 seconds, by default. Takes ~23 hours for `khugepaged` to scan 128GB of VMAs to collapse contiguous regions of 4kB pages into 2MB huge pages.
+* Its THP speed-ups are only measurable in long-running processes (like ANN training), but not in quick/micro benchmarks.
+
+This THP configuration, on the other hand, improves and maximises performance benefits of THP with immediate effect for compute-heavy workloads. It specifically seeks to undo or change any THP settings conflicting with the stated goal. Such as settings designed to limit memory allocation latency spikes or CPU bursts for databases or general-purpose software. It enables synchronous compaction precisely to minimize run-time of compute-heavy workloads with multi-MB datasets.
+
+In addition to minimizing the run-time of compute-heavy workloads, the effect of this THP configuration is also immediately noticeable and measurable as at least 5% shorter run-time in all existing timed runs of relatively short-lived processes completing within seconds, such as benchmarks, parallel builds and unit-tests. Unaffected by always enabled THP in the kernel command line alone.
+
+The two key extra configuration changes, in addition to enabling THP always:
+
+* Always allocate transparent huge pages immediately upon kernel memory allocation syscalls. When no huge pages are available for allocation, defragment RAM into huge pages on the spot.
+* `khugepaged` scans up to 8GB of eligible VMAs every 79 seconds. Which takes ~21 minutes for `khugepaged` to scan 128GB of VMAs. But now `khugepaged` collapses only any remaining memory regions which weren't collapsed during allocation.
 
 # Setup
 
 ## Enable transparent huge pages on your system
-The default THP configuration in Linux distros is rather sub-optimal.
+The provided [THP settings](thp-always.service.d/thp-always.sh) minimize run-time of compute-heavy workloads. Feel free to adjust them for your particular use-cases and workloads.
 
-These settings uncripple and maximize the positive effects of THP on performance. These should have been the default THP settings for everyone.
+All the settings cannot be set in the kernel command line and/or in sysctl configuration.
 
+To apply all the settings immediately run:
+```
+`sudo ./thp-always.service.d/thp-always.sh`
+```
+
+To apply the settings earliest while booting-up, install the systemd service (`WantedBy=basic.target` systemd target) with:
 ```
 $ sudo ./install-thp-always.sh
 ```
 
-# thp-meminfo
+# Using thp-meminfo
 thp-meminfo reports accurate totals of physical RAM page frames used by the entire system.
 
 ## thp-meminfo example output
@@ -50,9 +68,9 @@ $ ./thp-meminfo.sh
              nr_shmem_hugepages:           1
               nr_file_hugepages:           0
   nr_anon_transparent_hugepages:         741
-            pgdemote_khugepaged:           0
-             pgsteal_khugepaged:           0
-              pgscan_khugepaged:           0
+            pgdemote_`khugepaged`:           0
+             pgsteal_`khugepaged`:           0
+              pgscan_`khugepaged`:           0
           numa_huge_pte_updates:          31
           thp_migration_success:           0
              thp_migration_fail:           0
@@ -82,11 +100,11 @@ $ ./thp-meminfo.sh
 
 `thp_fault_alloc` counts immediately allocated THP.
 
-`thp_collapse_alloc` counts THP collapsed by `khugepaged` at some later indeterminate time.
+`thp_collapse_alloc` counts THP collapsed by ``khugepaged`` at some later indeterminate time.
 
 The ideal is to maximize `thp_fault_alloc` and minimize `thp_collapse_alloc`.
 
-# thp-usage
+# Using thp-usage
 thp-usage reports what processes use how many transparent huge page frames of RAM. Reading these metrics from /proc/*/smaps of all processes is what requires the root privilege.
 
 The totals row is a simple sum of per-process metrics. Same THP page frames of RAM shared by multiple processes get summed more than once.
