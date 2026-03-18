@@ -13,7 +13,7 @@ Linux default THP configuration cripples THP performance badly for all applicati
 
 This is a global perversion hurting every Linux user to comfort the few corporations selling the databases and associated services.
 
-### The "THP = bad" narrative is heavily database-centric.
+### The "THP = bad" narrative is heavily database-centric
 
 The overwhelming majority of public warnings, kernel documentation footnotes, distro tuning guides, and forum threads that say "disable THP" or "set defrag=never/madvise" come from exactly one cluster of applications:
 
@@ -65,14 +65,14 @@ The provided [THP settings](thp-always.service.d/thp-always.sh) minimize run-tim
 
 All the settings cannot be set in the kernel command line and/or in sysctl configuration.
 
-To apply all the settings immediately run:
+To apply the settings immediately run:
 ```
-`sudo ./thp-always.service.d/thp-always.sh`
+sudo ./thp-always.service.d/thp-always.sh
 ```
 
 To apply the settings earliest while booting-up, install the systemd service (`WantedBy=basic.target` systemd target) with:
 ```
-$ sudo ./install-thp-always.sh
+sudo ./install-thp-always.sh
 ```
 
 # Using thp-meminfo
@@ -80,7 +80,7 @@ thp-meminfo reports accurate totals of physical RAM page frames used by the enti
 
 ## thp-meminfo example output
 ```
-$ ./thp-meminfo.sh
+./thp-meminfo.sh
                   max_ptes_none:          64
                 max_ptes_shared:          64
                   max_ptes_swap:           0
@@ -147,7 +147,7 @@ My use case is machine learning using Ray Tune and PyTorch on CPU, and above cha
 
 
 ```
-$ sudo ./thp-usage.py
+sudo ./thp-usage.py
     pid	   pages	          MB	cmdline
  712676	   1,268	       2,536	ray::ImplicitFunc.train_buffered()
  711989	   1,070	       2,140	ray::ImplicitFunc.train_buffered()
@@ -211,7 +211,7 @@ $ sudo ./thp-usage.py
 To find out what huges pages are used for in a process, the following command can be used:
 
 ```
-$ grep -A10 -B13 "^AnonHugePages:[[:space:]]*[1-9]" /proc/670988/smaps
+grep -A10 -B13 "^AnonHugePages:[[:space:]]*[1-9]" /proc/670988/smaps
 55c49328c000-55c493f05000 rw-p 00000000 00:00 0                          [heap]
 Size:              12772 kB
 KernelPageSize:        4 kB
