@@ -84,44 +84,44 @@ thp-meminfo reports accurate totals of physical RAM page frames used by the enti
                   max_ptes_none:          64
                 max_ptes_shared:          64
                   max_ptes_swap:           0
-           scan_sleep_millisecs:      10,000
-                  pages_to_scan:       4,096
-                     full_scans:           2
-                pages_collapsed:         793
+           scan_sleep_millisecs:      79,000
+                  pages_to_scan:   2,097,152
+                     full_scans:         758
+                pages_collapsed:       9,389
 
-                       MemTotal: 131,820,388 kB
-                        MemFree: 117,469,332 kB
-                   MemAvailable: 124,435,856 kB
-                  AnonHugePages:   1,517,568 kB
-                 ShmemHugePages:       2,048 kB
+                       MemTotal:  65,172,968 kB
+                        MemFree:  37,040,164 kB
+                   MemAvailable:  52,848,848 kB
+                  AnonHugePages:   1,327,104 kB
+                 ShmemHugePages:           0 kB
                  ShmemPmdMapped:           0 kB
                   FileHugePages:           0 kB
                   FilePmdMapped:           0 kB
 
-             nr_shmem_hugepages:           1
+             nr_shmem_hugepages:           0
               nr_file_hugepages:           0
-  nr_anon_transparent_hugepages:         741
+  nr_anon_transparent_hugepages:         648
             pgdemote_khugepaged:           0
              pgsteal_khugepaged:           0
               pgscan_khugepaged:           0
-          numa_huge_pte_updates:          31
+          numa_huge_pte_updates:       1,129
           thp_migration_success:           0
              thp_migration_fail:           0
             thp_migration_split:           0
-                thp_fault_alloc:       8,837
+                thp_fault_alloc:      12,970
              thp_fault_fallback:           0
       thp_fault_fallback_charge:           0
-             thp_collapse_alloc:         793
+             thp_collapse_alloc:       9,389
       thp_collapse_alloc_failed:           0
-                 thp_file_alloc:           1
+                 thp_file_alloc:           0
               thp_file_fallback:           0
        thp_file_fallback_charge:           0
                 thp_file_mapped:           0
                  thp_split_page:           0
           thp_split_page_failed:           0
-        thp_deferred_split_page:         698
-                  thp_split_pmd:       1,014
-       thp_scan_exceed_none_pte:       1,383
+        thp_deferred_split_page:       8,173
+                  thp_split_pmd:       8,276
+       thp_scan_exceed_none_pte:     121,584
        thp_scan_exceed_swap_pte:           0
       thp_scan_exceed_share_pte:           0
                   thp_split_pud:           0
