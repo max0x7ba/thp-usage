@@ -1,5 +1,5 @@
 # thp-usage
-Provides utilities to help observing and measuring effects of Linux transparent huge pages.
+The project provides utilities to report Linux transparent huge pages usage. The information is read from multiple sources, joined/merged/aggregated and formatted into a report.
 
 Along with THP settings to minimize run-time of compute-heavy workloads.
 
