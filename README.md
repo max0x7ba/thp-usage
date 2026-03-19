@@ -41,7 +41,7 @@ While the ground reality is different:
 
 This configuration is the opposite extreme of the conservative settings recommended for databases and tail-latency-sensitive services. Those recommendations cripple THP benefits for compute-heavy batch workloads like the ones targeted here.
 
-The goal of this THP configuration is to minimize run-time of compute-heavy workloads with multi-MB datasets in multi-CPU systems with plenty of RAM, no NUMA and no swap disks. With datasets accessed in sequential fashion using aligned avx2 or wider load and store instructions, with loads and stores being the main bottleneck.
+The goal of this THP configuration is to minimize run-time of compute-heavy workloads with multi-MB datasets in multi-CPU systems with plenty of RAM, no NUMA and no swap disks. With datasets accessed in sequential fashion using aligned AVX2 or wider load and store instructions, with loads and stores being the main bottleneck. THP reduces TLB misses for these large sequential access patterns, keeping the AVX2 pipeline fed.
 
 Linux distro default THP configuration is sub-optimal for compute-heavy workloads because:
 
