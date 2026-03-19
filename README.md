@@ -11,7 +11,7 @@ Along with THP settings to minimize run-time of compute-heavy workloads.
 ## THP settings
 Linux default THP configuration cripples THP performance badly for all applications other than databases.
 
-This is a global perversion hurting every Linux user to comfort the few corporations selling the databases and associated services.
+This is a global perversion hurting every Linux user to benefit corporations selling databases and associated products and services.
 
 ### The "THP = bad" narrative is heavily database-centric
 
