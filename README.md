@@ -267,7 +267,7 @@ _Instruction_ TLB (iTLB) misses in AOT-compiled machine code remain unaffected. 
 
 `perf stat` command can be used to report performance metrics along with TLB misses of one or multiple running processes.
 
-In the following example, running processes are filtered with `pgrep` by looking for "strat2" sub-string match in their full command lines, and, next, their metrics are collected for 60,000 milliseconds (1 minute). It filters 16 compute-heavy worker sub-processes doing linear algebra over subsets of one same 6GB dataset. The main Python process parallellizes its compute stages by forking itself into the 16 worker sub-processes calling C++ modules with hand-crafted AVX2 linear algebra functions for ultimate possible performance (4.5 insn per cycle out of Zen3 maximum possible ~6 insn per cycle, executing a Python-3.10 application). The worker sub-processes bottleneck on loads missing the last level Zen3 32MB L3 cache, with `dTLB-load-misses` aggravating the cost of missing the CPU caches manyfold.
+In the following example, running processes are filtered with `pgrep` by looking for "strat2" sub-string match in their full command lines, and, next, their metrics are collected for 60,000 milliseconds (1 minute). It filters 16 compute-heavy worker sub-processes doing linear algebra over subsets of one same 6GB dataset. The worker sub-processes bottleneck on loads missing the CPU caches and having to load from RAM, with `dTLB-load-misses` aggravating the cost of missing the CPU caches manyfold.
 
 ```bash
 perf stat --timeout 60000 -dd -p $(pgrep -d, -f strat2)
