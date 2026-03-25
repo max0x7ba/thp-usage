@@ -1,7 +1,9 @@
-#!/bin/bash -e
+#!/bin/bash
 
 # Required Ubuntu packages:
 # sudo apt install coreutils sed stress-ng icdiff
+
+set -e
 
 readonly repo_dir="$(dirname "$(realpath "$BASH_ARGV0")")"
 cd "$repo_dir"
