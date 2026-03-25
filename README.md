@@ -60,6 +60,10 @@ TLB cache misses have to load/walk the page table of a process to resolve the vi
 
 On x86-64, the 4-level page table hierarchy (or 5-level on some systems) collapses with huge pages: a 2MB PMD entry replaces 512×4kB PTEs (level 1), and a 1GB PUD entry replaces 512×2MB PMDs (level 2).
 
+Large sequential access patterns are the best case scenario for the hardware CPU data prefetchers. However, the prefetchers do not speculatively cross a VMA page boundary because the virtual-to-physical mapping may be discontinuous -- the prefetcher cannot resolve the physical page frame address of the next VMA page without a TLB lookup. The prefetchers do not initiate TLB lookups speculatively, TLB misses block prefetching. Using contiguous physical 2 MiB huge page frames extends the prefetcher's effective runway 512× relative to default 4KiB page frames.
+
+AVX2 and wider load instructions have ~8 CPU cycles load-to-use latency from L1d cache (compared to 1-cycle latency of AVX2 logical and 3-cycle latency of AVX2 arithmetic instructions) -- the best case scenario when the data is already available in L1d cache. The hardware CPU data prefetchers make the best case scenario possible by loading data into L1d ahead of loads, until hitting a VMA page boundary. Vectorized math and linear algebra computations stall at loads/stores crossing VMA page boundaries because the next/previous page couldn't be automatically prefetched. Huge pages reduce the number of page boundaries for hardware CPU data prefetchers to block on.
+
 Linux distro default THP configuration is sub-optimal for compute-heavy workloads because:
 
 * It disables the synchronous compaction, which postpones and delegates allocating huge pages to `khugepaged` kernel thread sometime in the future, when there are no huge pages immediately available to fulfil an allocation request. No huge pages available is the default and expected state.
