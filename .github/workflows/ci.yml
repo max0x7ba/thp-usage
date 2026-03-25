@@ -1,0 +1,33 @@
+name: Continuous Integration Benchmarks
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+        - 'thp-benchmark.sh'
+        - 'thp-always.service.d/thp-always.sh'
+        - '!**'
+  pull_request:
+    branches: [ master ]
+    paths:
+        - 'thp-benchmark.sh'
+        - 'thp-always.service.d/thp-always.sh'
+        - '!**'
+
+jobs:
+  unit-test:
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Install Ubuntu packages
+      run: |
+        sudo apt-get update
+        sudo apt-get install --yes -qq coreutils sed stress-ng icdiff
+
+    - name: Run THP benchmark
+      run: ./thp-benchmark.sh
