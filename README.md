@@ -7,6 +7,7 @@ Along with THP settings to minimize run-time of compute-heavy workloads.
 
 * `thp-meminfo` reports accurate totals of physical RAM page frames usage by the entire system including huge page usage.
 * `thp-usage` reports what processes use how many transparent huge page frames of RAM.
+* `thp-benchmark` runs stress-ng memory-bound benchmarks of default vs compute-heavy workload THP settings and reports benchmark timings side-by-side.
 
 ## THP settings
 Linux defaults and many distro/cloud tunings prioritize avoiding regressions in databases and tail-latency-sensitive services -- often at the cost of leaving most other workloads with suboptimal THP performance.
@@ -53,14 +54,12 @@ Linux distro default THP configuration is sub-optimal for compute-heavy workload
 
 This THP configuration, on the other hand, improves and maximises performance benefits of THP with immediate effect for compute-heavy workloads. It specifically seeks to undo or change any THP settings conflicting with the stated goal. Such as settings designed to limit memory allocation latency spikes or CPU bursts for databases. It enables synchronous compaction precisely to minimize run-time of compute-heavy workloads with multi-GB datasets.
 
-In addition to minimizing the run-time of compute-heavy workloads, the effect of this THP configuration is also immediately noticeable and measurable as at least 5% shorter run-time in all existing timed runs of relatively short-lived processes completing within seconds, such as benchmarks, parallel builds and unit-tests. This immediate performance improvement for any/all processes comes from enabling synchronous compaction, otherwise unavailable to achieve with any of `transparent_hugepage/enabled` and/or `madvise` parameters.
-
-(Exact before and after timings are going to be published after benchmarking this updated THP configuration.)
-
 The two key extra configuration changes, in addition to enabling THP always:
 
 * Always allocate transparent huge pages immediately upon kernel memory allocation syscalls. When no huge pages are available for allocation, defragment RAM into huge pages on the spot -- the synchronous compaction.
 * `khugepaged` scans up to 8GB of eligible VMAs every 79 seconds. Which takes ~21 minutes for `khugepaged` to scan 128GB of VMAs. But now `khugepaged` collapses only any remaining memory regions which weren't collapsed during allocation.
+
+In addition to minimizing the run-time of compute-heavy workloads, the effect of this THP configuration is also immediately noticeable and measurable as at least 5% shorter run-time in all existing timed runs of relatively short-lived processes completing within seconds, such as benchmarks, parallel builds and unit-tests. This immediate performance improvement for any/all processes comes from enabling synchronous compaction, otherwise unavailable to achieve with any of `transparent_hugepage/enabled` and/or `madvise` parameters.
 
 ## Setup
 
@@ -217,6 +216,259 @@ sudo ./thp-usage.py
  704865	       1	           2	emacs
       0	  24,884	      49,768	<total>
 ```
+
+## thp-benchmark
+
+The provided benchmark compares timings of benchmark runs using default THP settings vs compute-heavy THP settings.
+
+The benchmark requires (Ubuntu) packages `coreutils`, `sed`, `stress-ng`, `icdiff` to have been installed:
+```
+sudo apt install coreutils sed stress-ng icdiff
+```
+
+With the default settings, it times running 2,000 iterations of `stress-ng --matrix` memory-bound methods `copy` `negate`, `mult`, `add`, `mean` on `double[1024][1024]` (8MiB array) matrices using 1 CPU. Benchmarking using more than 1 CPU introduces noise of CPU contention delays into timings. For this reason, the benchmark defaults to using 1 CPU.
+
+Takes ~3 seconds to run the benchmark with its default settings.
+
+Enabling the compute-heavy THP settings should result in orders of magnitude reduction in "Cache DTLB Read Miss" metric relative to default THP settings.
+
+### thp-benchmark example output
+
+On AMD Ryzen 5825U (25W laptop CPU) running with `mitigations=off` kernel option, enabling the compute-heavy THP settings does reduce "Cache DTLB Read Miss" count by orders of magnitude, as expected. Which improves the run-time ("bogo ops/s (real time)" metric) of the benchmark method by 5-45%:
+:
+* `copy` does one load followed by one store, +11% speedup.
+* `negate` does one load followed by negation (`xor` instruction flips the sign bit) and one store, +8% speedup. The negation instruction normally loads.
+* `mult` does one load followed by multiplication and one store, +5% speedup. The multiplication instruction normally loads.
+* `mean` does two loads followed by averaging and one store, +45% speedup.
+
+Full output:
+```bash
+./thp-benchmark.sh
+
+2026-03-25 08:33:00 Benchmark default THP settings with 1 CPUs (0) for 2000 operations.
+echo madvise > /sys/kernel/mm/transparent_hugepage/enabled
+echo madvise > /sys/kernel/mm/transparent_hugepage/defrag
+echo 511 > /sys/kernel/mm/transparent_hugepage/khugepaged/max_ptes_none
+echo 256 > /sys/kernel/mm/transparent_hugepage/khugepaged/max_ptes_shared
+echo 0 > /sys/kernel/mm/transparent_hugepage/khugepaged/max_ptes_swap
+echo 4096 > /sys/kernel/mm/transparent_hugepage/khugepaged/pages_to_scan
+echo 10000 > /sys/kernel/mm/transparent_hugepage/khugepaged/scan_sleep_millisecs
+
+2026-03-25 08:33:00 chrt --fifo 10 stress-ng --matrix 1 --taskset 0 --matrix-method copy --matrix-ops 2000 --matrix-size 1024 --no-madvise --seed 0 --metrics-brief --perf
+2026-03-25 08:33:00 chrt --fifo 10 stress-ng --matrix 1 --taskset 0 --matrix-method negate --matrix-ops 2000 --matrix-size 1024 --no-madvise --seed 0 --metrics-brief --perf
+2026-03-25 08:33:00 chrt --fifo 10 stress-ng --matrix 1 --taskset 0 --matrix-method mult --matrix-ops 2000 --matrix-size 1024 --no-madvise --seed 0 --metrics-brief --perf
+2026-03-25 08:33:00 chrt --fifo 10 stress-ng --matrix 1 --taskset 0 --matrix-method add --matrix-ops 2000 --matrix-size 1024 --no-madvise --seed 0 --metrics-brief --perf
+2026-03-25 08:33:01 chrt --fifo 10 stress-ng --matrix 1 --taskset 0 --matrix-method mean --matrix-ops 2000 --matrix-size 1024 --no-madvise --seed 0 --metrics-brief --perf
+
+2026-03-25 08:33:01 Benchmark always THP settings with 1 CPUs (0) for 2000 operations.
+echo 1 > /proc/sys/vm/overcommit_memory
+echo always > /sys/kernel/mm/transparent_hugepage/enabled
+echo always > /sys/kernel/mm/transparent_hugepage/defrag
+echo 79000 > /sys/kernel/mm/transparent_hugepage/khugepaged/scan_sleep_millisecs
+echo 2097152 > /sys/kernel/mm/transparent_hugepage/khugepaged/pages_to_scan
+echo 64 > /sys/kernel/mm/transparent_hugepage/khugepaged/max_ptes_none
+echo 64 > /sys/kernel/mm/transparent_hugepage/khugepaged/max_ptes_shared
+echo 0 > /sys/kernel/mm/transparent_hugepage/khugepaged/max_ptes_swap
+
+2026-03-25 08:33:01 chrt --fifo 10 stress-ng --matrix 1 --taskset 0 --matrix-method copy --matrix-ops 2000 --matrix-size 1024 --no-madvise --seed 0 --metrics-brief --perf
+2026-03-25 08:33:01 chrt --fifo 10 stress-ng --matrix 1 --taskset 0 --matrix-method negate --matrix-ops 2000 --matrix-size 1024 --no-madvise --seed 0 --metrics-brief --perf
+2026-03-25 08:33:01 chrt --fifo 10 stress-ng --matrix 1 --taskset 0 --matrix-method mult --matrix-ops 2000 --matrix-size 1024 --no-madvise --seed 0 --metrics-brief --perf
+2026-03-25 08:33:02 chrt --fifo 10 stress-ng --matrix 1 --taskset 0 --matrix-method add --matrix-ops 2000 --matrix-size 1024 --no-madvise --seed 0 --metrics-brief --perf
+2026-03-25 08:33:02 chrt --fifo 10 stress-ng --matrix 1 --taskset 0 --matrix-method mean --matrix-ops 2000 --matrix-size 1024 --no-madvise --seed 0 --metrics-brief --perf
+
+2026-03-25 08:33:02 Compare benchmark results.
+
+/tmp/thp-benchmark/default.copy.log                                                                 /tmp/thp-benchmark/always.copy.log
+defaulting to a 1 day, 0 secs run per stressor                                                      defaulting to a 1 day, 0 secs run per stressor
+dispatching hogs: 1 matrix                                                                          dispatching hogs: 1 matrix
+stressor       bogo ops real time  usr time  sys time   bogo ops/s     bogo ops/s                   stressor       bogo ops real time  usr time  sys time   bogo ops/s     bogo ops/s
+                          (secs)    (secs)    (secs)   (real time) (usr+sys time)                                             (secs)    (secs)    (secs)   (real time) (usr+sys time)
+matrix             2000      0.19      0.18      0.00     10671.02       10617.57                   matrix             2000      0.17      0.17      0.00     11944.33       11868.52
+matrix:                                                                                             matrix:
+               823,348,728 CPU Cycles                     4.107 B/sec                                              643,626,721 CPU Cycles                     3.502 B/sec
+               122,451,891 Instructions                   0.611 B/sec (0.149 instr. per cycle)                      96,049,538 Instructions                   0.523 B/sec (0.149 instr. per cycle)
+                30,406,011 Branch Instructions            0.152 B/sec                                               26,782,007 Branch Instructions            0.146 B/sec
+                    17,109 Branch Misses                 85.344 K/sec ( 0.056%)                                         13,815 Branch Misses                 75.157 K/sec ( 0.052%)
+                 6,842,152 Stalled Cycles Frontend       34.131 M/sec                                                8,194,683 Stalled Cycles Frontend       44.581 M/sec
+               500,546,990 Cache References               2.497 B/sec                                              511,017,959 Cache References               2.780 B/sec
+                68,566,410 Cache Misses                   0.342 B/sec (13.698%)                                      4,728,541 Cache Misses                  25.725 M/sec ( 0.925%)
+               556,390,848 Cache L1D Read                 2.775 B/sec                                              547,242,071 Cache L1D Read                 2.977 B/sec
+               252,843,782 Cache L1D Read Miss            1.261 B/sec (45.444%)                                    253,477,697 Cache L1D Read Miss            1.379 B/sec (46.319%)
+                 5,870,842 Cache L1D Prefetch            29.285 M/sec                                                5,787,101 Cache L1D Prefetch            31.483 M/sec
+                 1,982,954 Cache L1I Read                 9.892 M/sec                                                2,029,147 Cache L1I Read                11.039 M/sec
+                    46,006 Cache L1I Read Miss            0.229 M/sec                                                   59,353 Cache L1I Read Miss            0.323 M/sec
+                 4,206,594 Cache DTLB Read               20.984 M/sec                                                    6,187 Cache DTLB Read               33.659 K/sec
+                   387,330 Cache DTLB Read Miss           1.932 M/sec ( 9.208%)                                            479 Cache DTLB Read Miss           2.606 K/sec ( 7.742%)
+                         0 Cache ITLB Read                0.000 /sec                                                         0 Cache ITLB Read                0.000 /sec
+                       329 Cache ITLB Read Miss           1.641 K/sec                                                      178 Cache ITLB Read Miss         968.370 /sec
+                23,827,098 Cache BPU Read                 0.119 B/sec                                               23,961,196 Cache BPU Read                 0.130 B/sec
+                     4,505 Cache BPU Read Miss           22.472 K/sec ( 0.019%)                                          3,841 Cache BPU Read Miss           20.896 K/sec ( 0.016%)
+               187,275,578 CPU Clock                      0.934 B/sec                                              167,389,647 CPU Clock                      0.911 B/sec
+               187,217,046 Task Clock                     0.934 B/sec                                              167,315,812 Task Clock                     0.910 B/sec
+                         9 Page Faults Total             44.895 /sec                                                         9 Page Faults Total             48.963 /sec
+                         9 Page Faults Minor             44.895 /sec                                                         9 Page Faults Minor             48.963 /sec
+                         0 Page Faults Major              0.000 /sec                                                         0 Page Faults Major              0.000 /sec
+                         1 Context Switches               4.988 /sec                                                         1 Context Switches               5.440 /sec
+                         1 Cgroup Switches                4.988 /sec                                                         1 Cgroup Switches                5.440 /sec
+                         0 CPU Migrations                 0.000 /sec                                                         0 CPU Migrations                 0.000 /sec
+                         0 Alignment Faults               0.000 /sec                                                         0 Alignment Faults               0.000 /sec
+                         0 Emulation Faults               0.000 /sec                                                         0 Emulation Faults               0.000 /sec
+                         1 Cgroup Switches                4.988 /sec                                                         1 Cgroup Switches                5.440 /sec
+successful run completed in 0.20 secs                                                               successful run completed in 0.18 secs
+
+/tmp/thp-benchmark/default.negate.log                                                               /tmp/thp-benchmark/always.negate.log
+defaulting to a 1 day, 0 secs run per stressor                                                      defaulting to a 1 day, 0 secs run per stressor
+dispatching hogs: 1 matrix                                                                          dispatching hogs: 1 matrix
+stressor       bogo ops real time  usr time  sys time   bogo ops/s     bogo ops/s                   stressor       bogo ops real time  usr time  sys time   bogo ops/s     bogo ops/s
+                          (secs)    (secs)    (secs)   (real time) (usr+sys time)                                             (secs)    (secs)    (secs)   (real time) (usr+sys time)
+matrix             2000      0.17      0.17      0.00     11434.40       11393.48                   matrix             2000      0.16      0.16      0.00     12359.96       12306.56
+matrix:                                                                                             matrix:
+               760,223,035 CPU Cycles                     4.292 B/sec                                              613,148,993 CPU Cycles                     3.733 B/sec
+               759,818,410 Instructions                   4.290 B/sec (0.999 instr. per cycle)                     738,495,191 Instructions                   4.497 B/sec (1.204 instr. per cycle)
+                47,258,456 Branch Instructions            0.267 B/sec                                               45,798,347 Branch Instructions            0.279 B/sec
+                    16,409 Branch Misses                 92.642 K/sec ( 0.035%)                                         17,655 Branch Misses                  0.108 M/sec ( 0.039%)
+                15,786,849 Stalled Cycles Frontend       89.129 M/sec                                               14,929,936 Stalled Cycles Frontend       90.908 M/sec
+               465,544,692 Cache References               2.628 B/sec                                              498,296,364 Cache References               3.034 B/sec
+                82,636,752 Cache Misses                   0.467 B/sec (17.751%)                                      2,304,035 Cache Misses                  14.029 M/sec ( 0.462%)
+               550,045,687 Cache L1D Read                 3.105 B/sec                                              536,613,884 Cache L1D Read                 3.267 B/sec
+               253,632,967 Cache L1D Read Miss            1.432 B/sec (46.111%)                                    251,744,784 Cache L1D Read Miss            1.533 B/sec (46.914%)
+                 4,254,596 Cache L1D Prefetch            24.020 M/sec                                                3,580,807 Cache L1D Prefetch            21.803 M/sec
+                 4,998,811 Cache L1I Read                28.222 M/sec                                                5,216,213 Cache L1I Read                31.761 M/sec
+                    59,029 Cache L1I Read Miss            0.333 M/sec                                                   78,070 Cache L1I Read Miss            0.475 M/sec
+                 4,212,685 Cache DTLB Read               23.784 M/sec                                                    5,824 Cache DTLB Read               35.462 K/sec
+                   294,998 Cache DTLB Read Miss           1.665 M/sec ( 7.003%)                                            341 Cache DTLB Read Miss           2.076 K/sec ( 5.855%)
+                        25 Cache ITLB Read              141.144 /sec                                                         0 Cache ITLB Read                0.000 /sec
+                       530 Cache ITLB Read Miss           2.992 K/sec (2120.000%)                                          355 Cache ITLB Read Miss           2.162 K/sec
+                45,820,150 Cache BPU Read                 0.259 B/sec                                               43,327,517 Cache BPU Read                 0.264 B/sec
+                     8,887 Cache BPU Read Miss           50.174 K/sec ( 0.019%)                                          8,582 Cache BPU Read Miss           52.255 K/sec ( 0.020%)
+               174,761,027 CPU Clock                      0.987 B/sec                                              161,539,975 CPU Clock                      0.984 B/sec
+               174,729,907 Task Clock                     0.986 B/sec                                              161,504,847 Task Clock                     0.983 B/sec
+                         9 Page Faults Total             50.812 /sec                                                         9 Page Faults Total             54.801 /sec
+                         9 Page Faults Minor             50.812 /sec                                                         9 Page Faults Minor             54.801 /sec
+                         0 Page Faults Major              0.000 /sec                                                         0 Page Faults Major              0.000 /sec
+                         1 Context Switches               5.646 /sec                                                         1 Context Switches               6.089 /sec
+                         1 Cgroup Switches                5.646 /sec                                                         1 Cgroup Switches                6.089 /sec
+                         0 CPU Migrations                 0.000 /sec                                                         0 CPU Migrations                 0.000 /sec
+                         0 Alignment Faults               0.000 /sec                                                         0 Alignment Faults               0.000 /sec
+                         0 Emulation Faults               0.000 /sec                                                         0 Emulation Faults               0.000 /sec
+                         1 Cgroup Switches                5.646 /sec                                                         1 Cgroup Switches                6.089 /sec
+successful run completed in 0.18 secs                                                               successful run completed in 0.16 secs
+
+/tmp/thp-benchmark/default.mult.log                                                                 /tmp/thp-benchmark/always.mult.log
+defaulting to a 1 day, 0 secs run per stressor                                                      defaulting to a 1 day, 0 secs run per stressor
+dispatching hogs: 1 matrix                                                                          dispatching hogs: 1 matrix
+stressor       bogo ops real time  usr time  sys time   bogo ops/s     bogo ops/s                   stressor       bogo ops real time  usr time  sys time   bogo ops/s     bogo ops/s
+                          (secs)    (secs)    (secs)   (real time) (usr+sys time)                                             (secs)    (secs)    (secs)   (real time) (usr+sys time)
+matrix             2000      0.17      0.17      0.00     11508.63       11464.73                   matrix             2000      0.16      0.16      0.00     12189.29       12136.73
+matrix:                                                                                             matrix:
+               756,008,322 CPU Cycles                     4.295 B/sec                                              618,858,770 CPU Cycles                     3.717 B/sec
+               779,629,331 Instructions                   4.430 B/sec (1.031 instr. per cycle)                     745,965,969 Instructions                   4.480 B/sec (1.205 instr. per cycle)
+                52,412,832 Branch Instructions            0.298 B/sec                                               44,772,019 Branch Instructions            0.269 B/sec
+                    20,759 Branch Misses                  0.118 M/sec ( 0.040%)                                         21,008 Branch Misses                  0.126 M/sec ( 0.047%)
+                15,849,361 Stalled Cycles Frontend       90.050 M/sec                                               14,266,243 Stalled Cycles Frontend       85.677 M/sec
+               466,794,728 Cache References               2.652 B/sec                                              501,381,449 Cache References               3.011 B/sec
+                83,995,065 Cache Misses                   0.477 B/sec (17.994%)                                      2,635,017 Cache Misses                  15.825 M/sec ( 0.526%)
+               550,113,506 Cache L1D Read                 3.126 B/sec                                              537,992,635 Cache L1D Read                 3.231 B/sec
+               256,232,366 Cache L1D Read Miss            1.456 B/sec (46.578%)                                    250,006,113 Cache L1D Read Miss            1.501 B/sec (46.470%)
+                 5,937,931 Cache L1D Prefetch            33.737 M/sec                                                3,174,334 Cache L1D Prefetch            19.064 M/sec
+                 5,018,020 Cache L1I Read                28.510 M/sec                                                4,604,782 Cache L1I Read                27.654 M/sec
+                    48,765 Cache L1I Read Miss            0.277 M/sec                                                   70,139 Cache L1I Read Miss            0.421 M/sec
+                 4,234,595 Cache DTLB Read               24.059 M/sec                                                    5,612 Cache DTLB Read               33.703 K/sec
+                   292,604 Cache DTLB Read Miss           1.662 M/sec ( 6.910%)                                            377 Cache DTLB Read Miss           2.264 K/sec ( 6.718%)
+                        48 Cache ITLB Read              272.718 /sec                                                         0 Cache ITLB Read                0.000 /sec
+                       897 Cache ITLB Read Miss           5.096 K/sec (1868.750%)                                          221 Cache ITLB Read Miss           1.327 K/sec
+                43,483,403 Cache BPU Read                 0.247 B/sec                                               43,571,918 Cache BPU Read                 0.262 B/sec
+                     9,138 Cache BPU Read Miss           51.919 K/sec ( 0.021%)                                         10,841 Cache BPU Read Miss           65.106 K/sec ( 0.025%)
+               173,593,272 CPU Clock                      0.986 B/sec                                              163,392,443 CPU Clock                      0.981 B/sec
+               173,562,042 Task Clock                     0.986 B/sec                                              163,357,853 Task Clock                     0.981 B/sec
+                         8 Page Faults Total             45.453 /sec                                                         8 Page Faults Total             48.045 /sec
+                         8 Page Faults Minor             45.453 /sec                                                         8 Page Faults Minor             48.045 /sec
+                         0 Page Faults Major              0.000 /sec                                                         0 Page Faults Major              0.000 /sec
+                         1 Context Switches               5.682 /sec                                                         1 Context Switches               6.006 /sec
+                         1 Cgroup Switches                5.682 /sec                                                         1 Cgroup Switches                6.006 /sec
+                         0 CPU Migrations                 0.000 /sec                                                         0 CPU Migrations                 0.000 /sec
+                         0 Alignment Faults               0.000 /sec                                                         0 Alignment Faults               0.000 /sec
+                         0 Emulation Faults               0.000 /sec                                                         0 Emulation Faults               0.000 /sec
+                         1 Cgroup Switches                5.682 /sec                                                         1 Cgroup Switches                6.006 /sec
+successful run completed in 0.18 secs                                                               successful run completed in 0.17 secs
+
+/tmp/thp-benchmark/default.add.log                                                                  /tmp/thp-benchmark/always.add.log
+defaulting to a 1 day, 0 secs run per stressor                                                      defaulting to a 1 day, 0 secs run per stressor
+dispatching hogs: 1 matrix                                                                          dispatching hogs: 1 matrix
+stressor       bogo ops real time  usr time  sys time   bogo ops/s     bogo ops/s                   stressor       bogo ops real time  usr time  sys time   bogo ops/s     bogo ops/s
+                          (secs)    (secs)    (secs)   (real time) (usr+sys time)                                             (secs)    (secs)    (secs)   (real time) (usr+sys time)
+matrix             2000      0.33      0.32      0.00      6117.34        6105.47                   matrix             2000      0.24      0.23      0.00      8485.85        8459.41
+matrix:                                                                                             matrix:
+             1,414,286,688 CPU Cycles                     4.297 B/sec                                              902,395,704 CPU Cycles                     3.791 B/sec
+             1,032,623,382 Instructions                   3.137 B/sec (0.730 instr. per cycle)                   1,008,319,220 Instructions                   4.236 B/sec (1.117 instr. per cycle)
+                51,510,542 Branch Instructions            0.156 B/sec                                               46,170,926 Branch Instructions            0.194 B/sec
+                    25,676 Branch Misses                 78.008 K/sec ( 0.050%)                                         18,360 Branch Misses                 77.134 K/sec ( 0.040%)
+                19,773,730 Stalled Cycles Frontend       60.076 M/sec                                               21,489,587 Stalled Cycles Frontend       90.282 M/sec
+               744,004,297 Cache References               2.260 B/sec                                              754,420,341 Cache References               3.169 B/sec
+                59,604,544 Cache Misses                   0.181 B/sec ( 8.011%)                                      8,779,806 Cache Misses                  36.886 M/sec ( 1.164%)
+               827,397,355 Cache L1D Read                 2.514 B/sec                                              794,298,669 Cache L1D Read                 3.337 B/sec
+               388,454,816 Cache L1D Read Miss            1.180 B/sec (46.949%)                                    379,985,605 Cache L1D Read Miss            1.596 B/sec (47.839%)
+                17,698,614 Cache L1D Prefetch            53.771 M/sec                                                4,503,622 Cache L1D Prefetch            18.921 M/sec
+                 7,482,894 Cache L1I Read                22.734 M/sec                                                7,477,330 Cache L1I Read                31.414 M/sec
+                    85,789 Cache L1I Read Miss            0.261 M/sec                                                   69,912 Cache L1I Read Miss            0.294 M/sec
+                 6,303,215 Cache DTLB Read               19.150 M/sec                                                    9,824 Cache DTLB Read               41.273 K/sec
+                 6,336,875 Cache DTLB Read Miss          19.252 M/sec (100.534%)                                           572 Cache DTLB Read Miss           2.403 K/sec ( 5.822%)
+                         0 Cache ITLB Read                0.000 /sec                                                         0 Cache ITLB Read                0.000 /sec
+                       667 Cache ITLB Read Miss           2.026 K/sec                                                      373 Cache ITLB Read Miss           1.567 K/sec
+                42,314,490 Cache BPU Read                 0.129 B/sec                                               42,909,556 Cache BPU Read                 0.180 B/sec
+                     9,369 Cache BPU Read Miss           28.464 K/sec ( 0.022%)                                          7,128 Cache BPU Read Miss           29.946 K/sec ( 0.017%)
+               326,734,284 CPU Clock                      0.993 B/sec                                              235,575,375 CPU Clock                      0.990 B/sec
+               326,704,218 Task Clock                     0.993 B/sec                                              235,539,952 Task Clock                     0.990 B/sec
+                         9 Page Faults Total             27.343 /sec                                                         9 Page Faults Total             37.811 /sec
+                         9 Page Faults Minor             27.343 /sec                                                         9 Page Faults Minor             37.811 /sec
+                         0 Page Faults Major              0.000 /sec                                                         0 Page Faults Major              0.000 /sec
+                         1 Context Switches               3.038 /sec                                                         1 Context Switches               4.201 /sec
+                         1 Cgroup Switches                3.038 /sec                                                         1 Cgroup Switches                4.201 /sec
+                         0 CPU Migrations                 0.000 /sec                                                         0 CPU Migrations                 0.000 /sec
+                         0 Alignment Faults               0.000 /sec                                                         0 Alignment Faults               0.000 /sec
+                         0 Emulation Faults               0.000 /sec                                                         0 Emulation Faults               0.000 /sec
+                         1 Cgroup Switches                3.038 /sec                                                         1 Cgroup Switches                4.201 /sec
+successful run completed in 0.33 secs                                                               successful run completed in 0.24 secs
+
+/tmp/thp-benchmark/default.mean.log                                                                 /tmp/thp-benchmark/always.mean.log
+defaulting to a 1 day, 0 secs run per stressor                                                      defaulting to a 1 day, 0 secs run per stressor
+dispatching hogs: 1 matrix                                                                          dispatching hogs: 1 matrix
+stressor       bogo ops real time  usr time  sys time   bogo ops/s     bogo ops/s                   stressor       bogo ops real time  usr time  sys time   bogo ops/s     bogo ops/s
+                          (secs)    (secs)    (secs)   (real time) (usr+sys time)                                             (secs)    (secs)    (secs)   (real time) (usr+sys time)
+matrix             2000      0.35      0.34      0.00      5754.79        5743.89                   matrix             2000      0.24      0.24      0.00      8380.62        8357.81
+matrix:                                                                                             matrix:
+             1,431,307,220 CPU Cycles                     4.092 B/sec                                              904,417,850 CPU Cycles                     3.755 B/sec
+             1,293,282,688 Instructions                   3.698 B/sec (0.904 instr. per cycle)                   1,264,157,397 Instructions                   5.248 B/sec (1.398 instr. per cycle)
+                48,625,452 Branch Instructions            0.139 B/sec                                               45,135,635 Branch Instructions            0.187 B/sec
+                    23,358 Branch Misses                 66.786 K/sec ( 0.048%)                                         22,246 Branch Misses                 92.350 K/sec ( 0.049%)
+                21,518,269 Stalled Cycles Frontend       61.526 M/sec                                               23,237,257 Stalled Cycles Frontend       96.466 M/sec
+               756,685,466 Cache References               2.164 B/sec                                              758,384,617 Cache References               3.148 B/sec
+                64,719,099 Cache Misses                   0.185 B/sec ( 8.553%)                                      2,843,806 Cache Misses                  11.806 M/sec ( 0.375%)
+               830,333,320 Cache L1D Read                 2.374 B/sec                                              800,650,234 Cache L1D Read                 3.324 B/sec
+               388,531,043 Cache L1D Read Miss            1.111 B/sec (46.792%)                                    381,909,096 Cache L1D Read Miss            1.585 B/sec (47.700%)
+                15,333,682 Cache L1D Prefetch            43.843 M/sec                                                5,066,281 Cache L1D Prefetch            21.032 M/sec
+                 8,022,012 Cache L1I Read                22.937 M/sec                                                8,541,661 Cache L1I Read                35.459 M/sec
+                    77,183 Cache L1I Read Miss            0.221 M/sec                                                   81,899 Cache L1I Read Miss            0.340 M/sec
+                 6,167,840 Cache DTLB Read               17.635 M/sec                                                    9,621 Cache DTLB Read               39.940 K/sec
+                 6,205,337 Cache DTLB Read Miss          17.743 M/sec (100.608%)                                           546 Cache DTLB Read Miss           2.267 K/sec ( 5.675%)
+                         0 Cache ITLB Read                0.000 /sec                                                         0 Cache ITLB Read                0.000 /sec
+                       621 Cache ITLB Read Miss           1.776 K/sec                                                      304 Cache ITLB Read Miss           1.262 K/sec
+                42,319,505 Cache BPU Read                 0.121 B/sec                                               42,843,584 Cache BPU Read                 0.178 B/sec
+                    13,090 Cache BPU Read Miss           37.427 K/sec ( 0.031%)                                         14,483 Cache BPU Read Miss           60.124 K/sec ( 0.034%)
+               347,354,974 CPU Clock                      0.993 B/sec                                              238,459,840 CPU Clock                      0.990 B/sec
+               347,321,825 Task Clock                     0.993 B/sec                                              238,425,214 Task Clock                     0.990 B/sec
+                         9 Page Faults Total             25.733 /sec                                                         9 Page Faults Total             37.362 /sec
+                         9 Page Faults Minor             25.733 /sec                                                         9 Page Faults Minor             37.362 /sec
+                         0 Page Faults Major              0.000 /sec                                                         0 Page Faults Major              0.000 /sec
+                         1 Context Switches               2.859 /sec                                                         1 Context Switches               4.151 /sec
+                         1 Cgroup Switches                2.859 /sec                                                         1 Cgroup Switches                4.151 /sec
+                         0 CPU Migrations                 0.000 /sec                                                         0 CPU Migrations                 0.000 /sec
+                         0 Alignment Faults               0.000 /sec                                                         0 Alignment Faults               0.000 /sec
+                         0 Emulation Faults               0.000 /sec                                                         0 Emulation Faults               0.000 /sec
+                         1 Cgroup Switches                2.859 /sec                                                         1 Cgroup Switches                4.151 /sec
+successful run completed in 0.35 secs                                                               successful run completed in 0.24 secs
+```
+
 
 ## List VMAs using THP of a process
 

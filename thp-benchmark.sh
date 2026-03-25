@@ -51,7 +51,7 @@ function thp-benchmark {(
     $sched_opts true || sched_opts="nice -n-20"
     $sched_opts true || sched_opts=""
 
-    local methods="mean copy add"
+    local methods="copy negate mult add mean"
     for thp_cfg in default always; do
         local -n cfg_path=thp_cfg_${thp_cfg}
         log2 "${cY}Benchmark ${cG}${thp_cfg}${cY} THP settings with $n_cpus CPUs ($cpu_list) for $n_ops operations."
