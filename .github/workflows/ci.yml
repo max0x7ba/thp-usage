@@ -1,21 +1,6 @@
 name: Continuous Integration Benchmarks
 
-on:
-  push:
-    branches: [ master ]
-    paths:
-      - '!**'
-      - 'thp-benchmark.sh'
-      - 'thp-always.service.d/thp-always.sh'
-      - .github/workflows/ci.yml
-  pull_request:
-    branches: [ master ]
-    paths:
-      - '!**'
-      - 'thp-benchmark.sh'
-      - 'thp-always.service.d/thp-always.sh'
-      - .github/workflows/ci.yml
-  workflow_dispatch:
+on: [push, pull_request, workflow_dispatch]
 
 defaults:
   run:
