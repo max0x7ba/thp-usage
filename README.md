@@ -3,6 +3,20 @@ The project provides utilities to report Linux transparent huge pages usage. The
 
 Along with THP settings to minimize run-time of compute-heavy workloads.
 
+## Table of Contents
+
+- [Utilities](#utilities)
+- [THP settings](#thp-settings)
+  - [The "THP = bad" narrative is heavily database-centric](#the-thp--bad-narrative-is-heavily-database-centric)
+  - [THP settings for compute-heavy workloads](#thp-settings-for-compute-heavy-workloads)
+- [Setup](#setup)
+- [Using thp-meminfo](#using-thp-meminfo)
+- [Using thp-usage](#using-thp-usage)
+- [thp-benchmark](#thp-benchmark)
+- [Tips](#tips)
+  - [List VMAs using THP of a process](#list-vmas-using-thp-of-a-process)
+  - [Profile TLB hits and misses of a process](#profile-tlb-hits-and-misses-of-a-process)
+
 ## Utilities
 
 * `thp-meminfo` reports accurate totals of physical RAM page frames usage by the entire system including huge page usage.
@@ -10,7 +24,7 @@ Along with THP settings to minimize run-time of compute-heavy workloads.
 * `thp-benchmark` runs stress-ng memory-bound benchmarks of default vs compute-heavy workload THP settings and reports benchmark timings side-by-side.
 
 ## THP settings
-Linux defaults and many distro/cloud tunings prioritize avoiding regressions in databases and tail-latency-sensitive services -- often at the cost of leaving most other workloads with suboptimal THP performance.
+Linux defaults and many distro/cloud tunings prioritize avoiding regressions in databases and tail-latency-sensitive services -- often at the cost of leaving most other workloads with suboptimal [THP][1] performance.
 
 ### The "THP = bad" narrative is heavily database-centric
 
@@ -138,7 +152,7 @@ thp-meminfo reports accurate totals of physical RAM page frames used by the enti
 
 `thp_fault_fallback` counts failures to allocate THP immediately.
 
-`thp_collapse_alloc` counts THP collapsed by ``khugepaged`` at some later indeterminate time.
+`thp_collapse_alloc` counts THP collapsed by `khugepaged` at some later indeterminate time.
 
 The ideal is to maximize `thp_fault_alloc` and minimize `thp_collapse_alloc`.
 
@@ -235,10 +249,11 @@ Enabling the compute-heavy THP settings should result in orders of magnitude red
 ### thp-benchmark example output
 
 On AMD Ryzen 5825U (25W laptop CPU) running with `mitigations=off` kernel option, enabling the compute-heavy THP settings does reduce "Cache DTLB Read Miss" count by orders of magnitude, as expected. Which improves the run-time ("bogo ops/s (real time)" metric) of the benchmark method by 5-45%:
-:
+
 * `copy` does one load followed by one store, +11% speedup.
 * `negate` does one load followed by negation (`xor` instruction flips the sign bit) and one store, +8% speedup. The negation instruction normally loads.
 * `mult` does one load followed by multiplication and one store, +5% speedup. The multiplication instruction normally loads.
+* `add` does two loads followed by addition and one store, +39% speedup.
 * `mean` does two loads followed by averaging and one store, +45% speedup.
 
 Full output:
@@ -470,7 +485,9 @@ successful run completed in 0.35 secs                                           
 ```
 
 
-## List VMAs using THP of a process
+## Tips
+
+### List VMAs using THP of a process
 
 To find out what huge pages are used for in a process, the following command can be used:
 
@@ -504,7 +521,7 @@ VmFlags: rd wr mr mw me ac sd
 
 In the above command, `-A` and `-B` parameters match `smaps` format of Linux-5.10. If the format is different on your system, you may like to adjust these parameters appropriately.
 
-## Profile TLB hits and misses of a process
+### Profile TLB hits and misses of a process
 
 THP currently apply to VMAs of anonymous mappings of a process, such as bss, heap, stack segments of a process.
 
