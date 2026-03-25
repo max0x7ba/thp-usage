@@ -42,4 +42,4 @@ jobs:
       run: sudo bash -c 'echo 0 > /proc/sys/kernel/sched_autogroup_enabled'
 
     - name: Run THP benchmark
-      run: ./thp-benchmark.sh
+      run: ./"thp-benchmark.sh"
