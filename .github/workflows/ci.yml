@@ -4,14 +4,16 @@ on:
   push:
     branches: [ master ]
     paths:
-        - 'thp-benchmark.sh'
-        - 'thp-always.service.d/thp-always.sh'
+        - thp-benchmark.sh
+        - thp-always.service.d/thp-always.sh
+        - .github/workflows/ci.yml
         - '!**'
   pull_request:
     branches: [ master ]
     paths:
-        - 'thp-benchmark.sh'
-        - 'thp-always.service.d/thp-always.sh'
+        - thp-benchmark.sh
+        - thp-always.service.d/thp-always.sh
+        - .github/workflows/ci.yml
         - '!**'
 
 jobs:
