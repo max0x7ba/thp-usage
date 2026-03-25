@@ -1,6 +1,7 @@
 name: Continuous Integration Benchmarks
 
 on:
+  workflow_dispatch:
   push:
     branches: [ master ]
     # paths:
