@@ -9,6 +9,7 @@ Along with THP settings to minimize run-time of compute-heavy workloads.
 - [THP settings](#thp-settings)
   - [The "THP = bad" narrative is heavily database-centric](#the-thp--bad-narrative-is-heavily-database-centric)
   - [THP settings for compute-heavy workloads](#thp-settings-for-compute-heavy-workloads)
+  - [Linux security settings](#linux-security-settings)
 - [Setup](#setup)
 - [Using thp-meminfo](#using-thp-meminfo)
 - [Using thp-usage](#using-thp-usage)
@@ -78,6 +79,25 @@ The two key extra configuration changes, in addition to enabling THP always:
 * `khugepaged` scans up to 8GB of eligible VMAs every 79 seconds. Which takes ~21 minutes for `khugepaged` to scan 128GB of VMAs. But now `khugepaged` collapses only any remaining memory regions which weren't collapsed during allocation.
 
 In addition to minimizing the run-time of compute-heavy workloads, the effect of this THP configuration is also immediately noticeable and measurable as at least 5% shorter run-time in all existing timed runs of relatively short-lived processes completing within seconds, such as benchmarks, parallel builds and unit-tests. This immediate performance improvement for any/all processes comes from enabling synchronous compaction, otherwise unavailable to achieve with any of `transparent_hugepage/enabled` and/or `madvise` parameters.
+
+## Linux security settings
+
+There a few enabled by default Linux security settings that impact CPU performance the worst.
+
+* CPU vulnerability mitigations make Linux system calls much more expensive, also invalidating CPU caches. For best performance, the mitigations should be disabled with `mitigations=off` kernel command line option, if possible.
+
+* Address Space Layout Randomization (ASLR) makes CPU branch prediction less efficient. For AMD CPUs _"If the two threads are running different code, they should run in different linear pages to reduce Branch Target Buffer (BTB) collisions. Two threads which concurrently run the same code should run at the same linear and physical addresses. Operating system features which randomize the address layout should be configured appropriately. This is to facilitate BTB sharing between threads."_ For best performance, ASLR should be disabled with `norandmaps` kernel command line option, if possible.
+
+Extra x86_64 compiler options for maximum performance:
+
+* `-fno-plt` removes a level of indirection in calls to any position-independent code. Not enabled by default because it disables default lazy binding.
+
+* With ASLR disabled, disabling position independend code with compiler/linker `-fno-pie/-fno-PIC` options enables using cheapest direct calls into position-dependend code.
+
+* `-fcf-protection=none` disables injection of `endbr64` 4-byte instructions into every non-inline function. These extra `endbr64` instructions reduce
+CPU instruction cache efficiency and should be disabled, if possible, for best performance.
+
+* `-fno-math-errno -ffinite-math-only` is `-ffast-math` without its downsides. `-ffinite-math-only` removes extra NaN tests and conditional branches in generated machine code. But resolves `std::isnan/isinf/isfinite` calls to `false/false/true` at compile-time, so you'd need alternative implementations of these when compiling with `-ffinite-math-only`.
 
 ## Setup
 
