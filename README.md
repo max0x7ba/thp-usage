@@ -92,7 +92,7 @@ Extra x86_64 compiler options for maximum performance:
 
 * `-fno-plt` removes a level of indirection in calls to any position-independent code. Not enabled by default because it disables default lazy binding.
 
-* With ASLR disabled, disabling position independend code with compiler/linker `-fno-pie/-fno-PIC` options enables using cheapest direct calls into position-dependend code.
+* With ASLR disabled, disabling position independent code with compiler/linker `-fno-pie/-fno-PIC` options enables using cheapest direct calls into position-dependent code.
 
 * `-fcf-protection=none` disables injection of `endbr64` 4-byte instructions into every non-inline function. These extra `endbr64` instructions reduce
 CPU instruction cache efficiency and should be disabled, if possible, for best performance.
