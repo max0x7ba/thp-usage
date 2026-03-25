@@ -251,9 +251,9 @@ Enabling the compute-heavy THP settings should result in orders of magnitude red
 On AMD Ryzen 5825U (25W laptop CPU) running with `mitigations=off` kernel option, enabling the compute-heavy THP settings does reduce "Cache DTLB Read Miss" count by orders of magnitude, as expected. Which improves the run-time ("bogo ops/s (real time)" metric) of the benchmark method by 5-45%:
 
 * `copy` does one load followed by one store, +11% speedup.
-* `negate` does one load followed by negation (`xor` instruction flips the sign bit) and one store, +8% speedup. The negation instruction normally loads.
-* `mult` does one load followed by multiplication and one store, +5% speedup. The multiplication instruction normally loads.
-* `add` does two loads followed by addition and one store, +39% speedup.
+* `negate` does one load followed by negation (`xor` instruction flips the sign bit) and one store, +8% speedup. (The negation instruction normally loads.)
+* `mult` does one load followed by multiplication and one store, +5% speedup. (The multiplication instruction normally loads.)
+* `add` does two loads followed by addition and one store, +39% speedup. (The addition instruction normally loads.)
 * `mean` does two loads followed by averaging and one store, +45% speedup.
 
 Full output:
