@@ -12,7 +12,7 @@ Along with THP settings to minimize run-time of compute-heavy workloads.
 - [Setup](#setup)
 - [Using thp-meminfo](#using-thp-meminfo)
 - [Using thp-usage](#using-thp-usage)
-- [thp-benchmark](#thp-benchmark)
+- [Using thp-benchmark](#using-thp-benchmark)
 - [Tips](#tips)
   - [List VMAs using THP of a process](#list-vmas-using-thp-of-a-process)
   - [Profile TLB hits and misses of a process](#profile-tlb-hits-and-misses-of-a-process)
@@ -231,7 +231,7 @@ sudo ./thp-usage.py
       0	  24,884	      49,768	<total>
 ```
 
-## thp-benchmark
+## Using thp-benchmark
 
 The provided benchmark compares timings of benchmark runs using default THP settings vs compute-heavy THP settings.
 
