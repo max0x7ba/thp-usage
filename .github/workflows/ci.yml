@@ -17,6 +17,10 @@ on:
         # - .github/workflows/ci.yml
   workflow_dispatch:
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   unit-test:
     strategy:
@@ -35,7 +39,7 @@ jobs:
         sudo apt-get install --yes coreutils sed stress-ng icdiff
 
     - name: Disable autogroup
-      run: echo 0 | sudo tee /proc/sys/kernel/sched_autogroup_enabled
+      run: sudo --shell "echo 0 > /proc/sys/kernel/sched_autogroup_enabled"
 
     - name: Run THP benchmark
       run: ./thp-benchmark.sh
