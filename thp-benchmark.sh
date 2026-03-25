@@ -56,7 +56,7 @@ function thp-benchmark {(
         local -n cfg_path=thp_cfg_${thp_cfg}
         log2 "${cY}Benchmark ${cG}${thp_cfg}${cY} THP settings with $n_cpus CPUs ($cpu_list) for $n_ops operations."
         sed -E '/^echo/!d; s/ +/ /g' ${cfg_path}
-        sudo --shell source ${cfg_path}
+        sudo bash -c "source ${cfg_path}"
         echo
 
         for method in $methods; do
