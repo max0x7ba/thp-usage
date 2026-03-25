@@ -272,15 +272,15 @@ Enabling the compute-heavy THP settings should result in orders of magnitude red
 
 ### thp-benchmark example output
 
-On AMD Ryzen 5825U (25W laptop CPU) running with `mitigations=off` kernel option, enabling the compute-heavy THP settings does reduce "Cache DTLB Read Miss" count by orders of magnitude, as expected. Which improves the run-time ("bogo ops/s (real time)" metric) of the benchmark method by 5-45%:
+On AMD Ryzen 5825U (25W laptop CPU) running with `mitigations=off` kernel option, enabling the compute-heavy THP settings does reduce "Cache DTLB Read Miss" count by orders of magnitude, as expected. That improves the run-time ("bogo ops/s (real time)" metric) of the benchmark methods by 5-45%:
 
-* `copy` does one load followed by one store, +11% speedup.
-* `negate` does one load followed by negation (`xor` instruction flips the sign bit) and one store, +8% speedup. (The negation instruction normally loads.)
-* `mult` does one load followed by multiplication and one store, +5% speedup. (The multiplication instruction normally loads.)
-* `add` does two loads followed by addition and one store, +39% speedup. (The addition instruction normally loads.)
-* `mean` does two loads followed by averaging and one store, +45% speedup.
+* **+11% speedup in `copy`**. `copy` does one load followed by one store.
+* **+8% speedup in `negate`**. `negate` does one load followed by negation and one store. `negate` is `copy` with an extra `xor` instruction which flips the sign bit (loads with xor instruction, normally). The cost of the extra `xor` instruction with 1-cycle latency is unaffected by THP settings, hence smaller speedup relative to `copy`,
+* **+5% speedup in `mult`**. `mult` does one load followed by multiplication and one store. `mult` is `negate` with a 3-cycle latency `mul` instruction instead of `xor`, hence smaller speedup relative to `negate`.
+* **+39% speedup in `add`**. `add` does two loads followed by addition and one store. `add` is similar to `mult` with an additional load. Making 3 out of 4 operations (2 loads, 1 add, 1 store; loads with add instruction, normally) faster delivers greater speedup.
+* **+45% speedup in `mean`**.`mean` does two loads of row elements of 2 matrices, and one store per row -- 1024× fewer stores relative to `add`. Hence, greater speedup relative to `add`.
 
-Full output:
+Full output (the side-by-side diff requires hotizontal scrolling when viewed in GitHub):
 ```bash
 ./thp-benchmark.sh
 
