@@ -34,9 +34,8 @@ jobs:
         sudo apt-get update --yes
         sudo apt-get install --yes coreutils sed stress-ng icdiff
 
-    - name: Update kernel configuration
-      run: |
-        echo 0 | sudo tee /proc/sys/kernel/sched_autogroup_enabled
+    - name: Disable autogroup
+      run: echo 0 | sudo tee /proc/sys/kernel/sched_autogroup_enabled
 
     - name: Run THP benchmark
       run: ./thp-benchmark.sh
