@@ -4,21 +4,22 @@ on:
   push:
     branches: [ master ]
     paths:
+        - '!**'
         - thp-benchmark.sh
         - thp-always.service.d/thp-always.sh
         - .github/workflows/ci.yml
-        - '!**'
   pull_request:
     branches: [ master ]
     paths:
+        - '!**'
         - thp-benchmark.sh
         - thp-always.service.d/thp-always.sh
         - .github/workflows/ci.yml
-        - '!**'
 
 jobs:
   unit-test:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-22.04, ubuntu-latest]
     runs-on: ${{ matrix.os }}
