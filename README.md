@@ -101,6 +101,13 @@ CPU instruction cache efficiency and should be disabled, if possible, for best p
 
 ## Setup
 
+```
+git clone git@github.com:max0x7ba/thp-usage.git
+cd thp-usage
+```
+
+The following command lines are relative to `thp-usage` working directory.
+
 ### Enable transparent huge pages on your system
 The provided [THP settings](thp-always.service.d/thp-always.sh) minimize run-time of compute-heavy workloads. Feel free to adjust them for your particular use-cases and workloads.
 
@@ -266,7 +273,17 @@ sudo apt install coreutils sed stress-ng icdiff
 
 With the default settings, it times running 2,000 iterations of `stress-ng --matrix` memory-bound methods `copy` `negate`, `mult`, `add`, `mean` on `double[1024][1024]` (8MiB array) matrices using 1 CPU. Benchmarking using more than 1 CPU introduces noise of CPU contention delays into timings. For this reason, the benchmark defaults to using 1 CPU.
 
-Takes ~3 seconds to run the benchmark with its default settings.
+Takes ~3 seconds to run the benchmark with its default settings:
+```
+./thp-benchmark.sh
+```
+
+Settings are configurable with environment variables, e.g.:
+```
+n_cpus=8 n_ops=500 cpu_step=1 log_dir=/tmp/another-thp-benchmark ./thp-benchmark.sh
+```
+
+`cpu_step=1` pins benchmark threads to CPUs in [0, n_cpus) range. Default `cpu_step=2` pins benchmark threads to every 2nd CPU in [0, n_cpus*2) range. This parameter prevents pinning 2 benchmark threads onto 2 SMT vCPUs sharing one CPU core. The correct value depends on the CPU topology, and it is the one that minimizes run-time when benchmarking using more than one CPU.
 
 Enabling the compute-heavy THP settings should result in orders of magnitude reduction in "Cache DTLB Read Miss" metric relative to default THP settings.
 
