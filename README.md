@@ -3,6 +3,8 @@ The project provides utilities to report Linux transparent huge pages usage. The
 
 Along with THP settings to minimize run-time of compute-heavy workloads.
 
+And a benchmark to measure effects of different THP settings.
+
 ## Table of Contents
 
 - [Utilities](#utilities)
