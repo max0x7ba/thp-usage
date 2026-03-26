@@ -84,7 +84,7 @@ In addition to minimizing the run-time of compute-heavy workloads, the effect of
 
 ## Linux security settings
 
-There a few enabled by default Linux security settings that impact CPU performance the worst.
+There are a few enabled by default Linux security settings that impact CPU performance the worst.
 
 * CPU vulnerability mitigations make Linux system calls much more expensive, also invalidating CPU caches. For best performance, the mitigations should be disabled with `mitigations=off` kernel command line option, if possible.
 
@@ -211,55 +211,7 @@ sudo ./thp-usage.py
  712422	   1,064	       2,128	ray::ImplicitFunc.train_buffered()
  713737	   1,064	       2,128	ray::ImplicitFunc.train_buffered()
  711327	     864	       1,728	ray::ImplicitFunc.train_buffered()
- 713076	     863	       1,726	ray::ImplicitFunc.train_buffered()
- 713122	     863	       1,726	ray::ImplicitFunc.train_buffered()
- 713498	     863	       1,726	ray::ImplicitFunc.train_buffered()
- 714082	     863	       1,726	ray::ImplicitFunc.train_buffered()
- 714235	     863	       1,726	ray::ImplicitFunc.train_buffered()
- 712584	     862	       1,724	ray::ImplicitFunc.train_buffered()
- 713152	     862	       1,724	ray::ImplicitFunc.train_buffered()
- 710998	     861	       1,722	ray::ImplicitFunc.train_buffered()
- 712577	     861	       1,722	ray::ImplicitFunc.train_buffered()
- 711860	     860	       1,720	ray::ImplicitFunc.train_buffered()
- 712579	     860	       1,720	ray::ImplicitFunc.train_buffered()
- 713716	     858	       1,716	ray::ImplicitFunc.train_buffered()
- 712313	     857	       1,714	ray::ImplicitFunc.train_buffered()
- 711680	     854	       1,708	ray::ImplicitFunc.train_buffered()
- 713125	     811	       1,622	ray::ImplicitFunc.train_buffered()
- 714329	     663	       1,326	ray::ImplicitFunc.train_buffered()
- 712401	     661	       1,322	ray::ImplicitFunc.train_buffered()
- 713097	     659	       1,318	ray::ImplicitFunc.train_buffered()
- 710780	     635	       1,270	ray::ImplicitFunc.train_buffered()
- 711244	     568	       1,136	ray::ImplicitFunc.train_buffered()
- 713823	     460	         920	ray::ImplicitFunc.train_buffered()
- 711992	     459	         918	ray::ImplicitFunc.train_buffered()
- 712697	     360	         720	ray::ImplicitFunc.train_buffered()
- 713819	     228	         456	ray::ImplicitFunc.train_buffered()
-   3412	     197	         394	/usr/bin/influxd
- 712180	     192	         384	ray::ImplicitFunc.train_buffered()
- 712712	     192	         384	ray::ImplicitFunc.train_buffered()
- 670968	     148	         296	python3 -m es.tune4 --samples 3000
-   4128	      54	         108	/usr/bin/plasmashell
-   4026	      35	          70	/usr/bin/kwin_x11
- 670976	      22	          44	/home/max/anaconda3/envs/torch/lib/python3.8/site-packages/ray/core/src/ray/thirdparty/redis/src/redis-server ...
- 670981	      19	          38	/home/max/anaconda3/envs/torch/lib/python3.8/site-packages/ray/core/src/ray/thirdparty/redis/src/redis-server ...
- 670967	      18	          36	xz --best --stdout
-   2219	      16	          32	/usr/lib/xorg/Xorg -nolisten tcp ...
- 671000	       7	          14	/home/max/anaconda3/envs/torch/bin/python3 ...
- 671065	       6	          12	/home/max/anaconda3/envs/torch/bin/python3 ...
- 671027	       5	          10	/home/max/anaconda3/envs/torch/bin/python3 ...
- 670988	       4	           8	/home/max/anaconda3/envs/torch/bin/python3 ...
-   1335	       3	           6	/opt/piavpn/bin/pia-daemon
-   4311	       3	           6	/usr/bin/konsole
- 670986	       2	           4	/home/max/anaconda3/envs/torch/lib/python3.8/site-packages/ray/core/src/ray/gcs/gcs_server ...
-   1261	       1	           2	/usr/sbin/rsyslogd -n -iNONE
-   1298	       1	           2	/usr/lib/udisks2/udisksd
-   4108	       1	           2	/usr/lib/x86_64-linux-gnu/libexec/kactivitymanagerd
-   4136	       1	           2	/usr/bin/xembedsniproxy
-   4168	       1	           2	/usr/lib/x86_64-linux-gnu/libexec/DiscoverNotifier
-   4186	       1	           2	/usr/libexec/at-spi-bus-launcher --launch-immediately
- 668856	       1	           2	/usr/libexec/xdg-desktop-portal
- 671026	       1	           2	/home/max/anaconda3/envs/torch/lib/python3.8/site-packages/ray/core/src/ray/raylet/raylet ...
+    ...	     ...	         ...	... (25 more ray workers, influxd, plasmashell, etc.)
  704865	       1	           2	emacs
       0	  24,884	      49,768	<total>
 ```
@@ -299,7 +251,19 @@ On AMD Ryzen 5825U (25W laptop CPU) running with `mitigations=off` kernel option
 * **+39% speedup in `add`**. `add` does two loads followed by addition and one store. `add` is similar to `mult` with an additional load. Making 3 out of 4 operations (2 loads, 1 add, 1 store; loads with add instruction, normally) faster delivers greater speedup.
 * **+45% speedup in `mean`**.`mean` does two loads of row elements of 2 matrices, and one store per row -- 1024× fewer stores relative to `add`. Hence, greater speedup relative to `add`.
 
-Full output (the side-by-side diff requires hotizontal scrolling when viewed in GitHub):
+Summary of key metrics (AMD Ryzen 5825U, `mitigations=off`):
+
+| Method   | default bogo ops/s | always bogo ops/s | Speedup | default DTLB Read Miss | always DTLB Read Miss |
+|----------|--------------------:|------------------:|--------:|-----------------------:|----------------------:|
+| `copy`   |          10,671     |         11,944    |   +12%  |            387,330     |                  479  |
+| `negate` |          11,434     |         12,360    |    +8%  |            294,998     |                  341  |
+| `mult`   |          11,509     |         12,189    |    +6%  |            292,604     |                  377  |
+| `add`    |           6,117     |          8,486    |   +39%  |          6,336,875     |                  572  |
+| `mean`   |           5,755     |          8,381    |   +46%  |          6,205,337     |                  546  |
+
+<details>
+<summary>Full benchmark output (the side-by-side diff requires horizontal scrolling)</summary>
+
 ```bash
 ./thp-benchmark.sh
 
@@ -526,6 +490,8 @@ matrix:                                                                         
                          1 Cgroup Switches                2.859 /sec                                                         1 Cgroup Switches                4.151 /sec
 successful run completed in 0.35 secs                                                               successful run completed in 0.24 secs
 ```
+
+</details>
 
 
 ## Tips
