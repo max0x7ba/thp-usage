@@ -27,7 +27,7 @@ jobs:
     - name: Install Ubuntu packages
       run: |
         sudo apt-get update --yes
-        sudo apt-get install --yes coreutils sed awk stress-ng icdiff
+        sudo apt-get install --yes coreutils sed gawk stress-ng icdiff
 
     - name: Run THP benchmark
       run: ./"thp-benchmark.sh"
