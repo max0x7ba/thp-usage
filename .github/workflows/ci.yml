@@ -18,13 +18,16 @@ jobs:
     steps:
     - uses: actions/checkout@v6
 
-    - name: Install Ubuntu packages
-      run: |
-        sudo apt-get update --yes
-        sudo apt-get install --yes coreutils sed stress-ng icdiff
+    - name: Disable Address Space Layout Randomization
+      run: sudo bash -c 'echo 0 > /proc/sys/kernel/randomize_va_space'
 
     - name: Disable autogroup
       run: sudo bash -c 'echo 0 > /proc/sys/kernel/sched_autogroup_enabled'
+
+    - name: Install Ubuntu packages
+      run: |
+        sudo apt-get update --yes
+        sudo apt-get install --yes coreutils sed awk stress-ng icdiff
 
     - name: Run THP benchmark
       run: ./"thp-benchmark.sh"
