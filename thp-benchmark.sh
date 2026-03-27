@@ -62,8 +62,8 @@ function exit-on-signal {
 # v=1 n_cpus=2 n_ops=100 ~/src/thp-usage/thp-benchmark.sh
 function thp-benchmark {(
     local -i n_cpus=${n_cpus:-1}
-    local -i n_ops=${n_ops:-1000}
-    local -i size=${size:-2048}
+    local -i n_ops=${n_ops:-2000}
+    local -i size=${size:-1024}
     local -i v=${v:-0}
 
     local log_dir=${log_dir:-/tmp/thp-benchmark}
