@@ -1,21 +1,31 @@
 # thp-usage
-The project provides utilities to report Linux transparent huge pages usage. The information is read from multiple sources, joined/merged/aggregated and formatted into a report.
+The default Linux THP configuration cripples THP performance benefits badly for compatibility with niche use-cases involving databases and tail-latency-sensitive services. This project provides an alternative THP configuration designed to minimize run-time of memory-bound workloads with sequential access.
 
-Along with THP settings to minimize run-time of compute-heavy workloads.
+Workloads are memory-bound when accessing data unavailable (yet) in CPU caches. Large datasets accessed sequentially become memory-bound soonest.
 
-And a benchmark to measure effects of different THP settings.
+This THP configuration speeds up memory-bound 0-compute `memcpy` by +10-100%. Memory-bound workloads dominated by compute time (compute-heavy) get +10-50% speed-ups.
+
+Such large speed-ups may sound incredible, on the surface. Modern CPUs, however, bottleneck the worst when load/store instructions miss CPU data caches and stall waiting on fetching from RAM. 2MiB huge pages reduce TLB caches misses up to 512× relative to default 4KiB pages. And, subsequently, CPU data cache misses caused by CPU hardware prefetchers stalling at page boundaries due to page faults and/or TLB caches misses. Huge pages maximize the efficiency of CPU hardware prefetchers, minimize CPU data cache misses and the costs of fetching from RAM, unlike anything else.
+
+Some sequential access pattern examples are kernel zero-filling/scrubbing page frames to prevent information leakage prior to mapping into a different process, `memset` and `memcpy`, many C++ standard library algorithms (with default sequential execution policy), `numpy` and `pytorch` linear algebra computations, Direct Memory Access utilized by GPUs and high-speed PCIe devices.
+
+From this perspective, the speed-ups expected from THP are quite high and unprecedented. Enabling THP with kernel command line option "transparent_hugepage=always" is insufficient and has rather underwhelming effect, nowhere near to the expected speed-ups. This THP configuration merely re-enables the complete functionality of Linux THP (disabled by default for compatibility) and that realizes the high unprecedented speed-ups expected from THP.
+
+A benchmark to compare performance of memory-bound and compute-heavy workloads with different THP configurations is also provided. It uses popular open-source software, normally available in default Linux distribution repositories. Requires no compilation or docker, takes ~3 seconds to run and report results.
+
+And utilities for reporting transparent huge pages usage in legible format and no friction. Friction comes from having to read statistics from multiple files, filter/join/merge/aggregate and format nicely to get complete THP usage information.
 
 ## Table of Contents
 
 - [Utilities](#utilities)
 - [THP settings](#thp-settings)
   - [The "THP = bad" narrative is heavily database-centric](#the-thp--bad-narrative-is-heavily-database-centric)
-  - [THP settings for compute-heavy workloads](#thp-settings-for-compute-heavy-workloads)
-  - [Linux security settings](#linux-security-settings)
+  - [THP settings for memory-bound workloads](#thp-settings-for-memory-bound-workloads)
+- [Linux security settings](#linux-security-settings)
 - [Setup](#setup)
+- [Using thp-benchmark](#using-thp-benchmark)
 - [Using thp-meminfo](#using-thp-meminfo)
 - [Using thp-usage](#using-thp-usage)
-- [Using thp-benchmark](#using-thp-benchmark)
 - [Tips](#tips)
   - [List VMAs using THP of a process](#list-vmas-using-thp-of-a-process)
   - [Profile TLB hits and misses of a process](#profile-tlb-hits-and-misses-of-a-process)
@@ -24,7 +34,7 @@ And a benchmark to measure effects of different THP settings.
 
 * `thp-meminfo` reports accurate totals of physical RAM page frames usage by the entire system including huge page usage.
 * `thp-usage` reports what processes use how many transparent huge page frames of RAM.
-* `thp-benchmark` runs stress-ng memory-bound benchmarks of default vs compute-heavy workload THP settings and reports benchmark timings side-by-side.
+* `thp-benchmark` runs `stress-ng` memory-bound benchmarks of default vs memory-bound workload THP settings and reports benchmark timings side-by-side.
 
 ## THP settings
 Linux defaults and many distro/cloud tunings prioritize avoiding regressions in databases and tail-latency-sensitive services -- often at the cost of leaving most other workloads with suboptimal [THP][1] performance.
@@ -53,13 +63,13 @@ While the ground reality is different:
 * For the large class of batch/ML/quant/HPC workloads, aggressive THP (`always + defrag=always + tuned khugepaged`) is not only reasonable - it's often one of the highest-ROI single tuning knobs available on modern Linux (especially on recent kernels with improved compaction heuristics).
 * The database-centric "disable THP" advice is actively harmful when blindly applied to throughput-oriented code.
 
-### THP settings for compute-heavy workloads
+### THP settings for memory-bound workloads
 
-This configuration is the opposite extreme of the default Linux THP settings, which trade most of THP performance benefits for compatibility with niche use-cases involving databases and tail-latency-sensitive services. These default "conservative" Linux THP settings for database compatibility cripple THP performance benefits badly for compute-heavy batch workloads like the ones targeted here.
+This configuration is the opposite extreme of the default Linux THP settings, which trade most of THP performance benefits for compatibility with niche use-cases involving databases and tail-latency-sensitive services. These default "conservative" Linux THP settings for database compatibility cripple THP performance benefits badly for memory-bound batch workloads like the ones targeted here.
 
-The goal of this THP configuration is to minimize run-time of compute-heavy workloads with multi-GB datasets in multi-CPU systems with plenty of RAM, no NUMA and no swap disks. With datasets accessed in sequential fashion using aligned AVX2 or wider load and store instructions, with loads and stores being the main bottleneck. THP reduces data TLB misses for these large sequential access patterns, keeping the AVX2 pipeline fed.
+The goal of this THP configuration is to minimize run-time of memory-bound workloads with multi-GB datasets in multi-CPU systems with plenty of RAM, no NUMA and no swap disks. With datasets accessed in sequential fashion using aligned AVX2 or wider load and store instructions, with loads and stores being the main bottleneck. THP reduces data TLB misses for these large sequential access patterns, keeping the AVX2 pipeline fed.
 
-TLB cache misses have to load/walk the page table of a process to resolve the virtual address to physical. Page tables of a process are accessed less frequently than anything else and aren't expected to remain unevicted in any level of CPU cache hierarchy by the time of the next page table walk in compute-heavy workloads. The page table walks make TLB cache misses most expensive and most detrimental to performance of compute-heavy workloads. THP is intended to minimize both TLB cache misses and the cost of page table walks by replacing a level of 512 page table entries with one 512× larger huge-page at the next higher level of page table hierarchy.
+TLB cache misses have to load/walk the page table of a process to resolve the virtual address to physical. Page tables of a process are accessed less frequently than anything else and aren't expected to remain unevicted in any level of CPU cache hierarchy by the time of the next page table walk in memory-bound workloads. The page table walks make TLB cache misses most expensive and most detrimental to performance of memory-bound workloads. THP is intended to minimize both TLB cache misses and the cost of page table walks by replacing a level of 512 page table entries with one 512× larger huge-page at the next higher level of page table hierarchy.
 
 On x86-64, the 4-level page table hierarchy (or 5-level on some systems) collapses with huge pages: a 2MB PMD entry replaces 512×4kB PTEs (level 1), and a 1GB PUD entry replaces 512×2MB PMDs (level 2).
 
@@ -67,20 +77,20 @@ Large sequential access patterns are the best case scenario for the hardware CPU
 
 AVX2 and wider load instructions have ~8 CPU cycles load-to-use latency from L1d cache (compared to 1-cycle latency of AVX2 logical and 3-cycle latency of AVX2 arithmetic instructions) -- the best case scenario when the data is already available in L1d cache. The hardware CPU data prefetchers make the best case scenario possible by loading data into L1d ahead of loads, until hitting a VMA page boundary. Vectorized math and linear algebra computations stall at loads/stores crossing VMA page boundaries because the next/previous page couldn't be automatically prefetched. Huge pages reduce the number of page boundaries for hardware CPU data prefetchers to block on.
 
-Linux distro default THP configuration is sub-optimal for compute-heavy workloads because:
+Linux distro default THP configuration is sub-optimal for memory-bound workloads because:
 
 * It disables the synchronous compaction, which postpones and delegates allocating huge pages to `khugepaged` kernel thread sometime in the future, when there are no huge pages immediately available to fulfil an allocation request. No huge pages available is the default and expected state.
 * One sole low priority `khugepaged` kernel thread scans virtual memory areas (VMAs) of processes, scanning up to 16MB of eligible VMAs every 10 seconds, by default. Takes ~23 hours for `khugepaged` to scan 128GB of VMAs to collapse contiguous regions of 4kB pages into 2MB huge pages. One `khugepaged` kernel thread collapsing VMAs of multiple processes running simultaneously in other CPU cores is a text-book single-producer-multiple-consumers bottleneck, when adding more consumers/CPUs only makes consumers bottleneck more.
 * Synchronous compaction disabled by default effectively makes THP unavailable for most processes, except long-running ones. THP speed-ups without synchronous compaction are only measurable in long-running processes (like ANN training), on a good day.
 
-This THP configuration, on the other hand, improves and maximises performance benefits of THP with immediate effect for compute-heavy workloads. It specifically seeks to undo or change any THP settings conflicting with the stated goal. Such as settings designed to limit memory allocation latency spikes or CPU bursts for databases. It enables synchronous compaction precisely to minimize run-time of compute-heavy workloads with multi-GB datasets.
+This THP configuration, on the other hand, improves and maximises performance benefits of THP with immediate effect for memory-bound workloads. It specifically seeks to undo or change any THP settings conflicting with the stated goal. Such as settings designed to limit memory allocation latency spikes or CPU bursts for databases. It enables synchronous compaction precisely to minimize run-time of memory-bound workloads with multi-GB datasets.
 
 The two key extra configuration changes, in addition to enabling THP always:
 
 * Always allocate transparent huge pages immediately upon kernel memory allocation syscalls. When no huge pages are available for allocation, defragment RAM into huge pages on the spot -- the synchronous compaction.
 * `khugepaged` scans up to 8GB of eligible VMAs every 79 seconds. Which takes ~21 minutes for `khugepaged` to scan 128GB of VMAs. But now `khugepaged` collapses only any remaining memory regions which weren't collapsed during allocation.
 
-In addition to minimizing the run-time of compute-heavy workloads, the effect of this THP configuration is also immediately noticeable and measurable as at least 5% shorter run-time in all existing timed runs of relatively short-lived processes completing within seconds, such as benchmarks, parallel builds and unit-tests. This immediate performance improvement for any/all processes comes from enabling synchronous compaction, otherwise unavailable to achieve with any of `transparent_hugepage/enabled` and/or `madvise` parameters.
+In addition to minimizing the run-time of memory-bound workloads, the effect of this THP configuration is also immediately noticeable and measurable as at least 5% shorter run-time in all existing timed runs of relatively short-lived processes completing within seconds, such as benchmarks, parallel builds and unit-tests. This immediate performance improvement for any/all processes comes from enabling synchronous compaction, otherwise unavailable to achieve with any of `transparent_hugepage/enabled` and/or `madvise` parameters.
 
 ## Linux security settings
 
@@ -103,7 +113,7 @@ CPU instruction cache efficiency and should be disabled, if possible, for best p
 
 ## Setup
 
-```
+```bash
 git clone git@github.com:max0x7ba/thp-usage.git
 cd thp-usage
 ```
@@ -111,9 +121,9 @@ cd thp-usage
 The following command lines are relative to `thp-usage` working directory.
 
 ### Enable transparent huge pages on your system
-The provided [THP settings](thp-always.service.d/thp-always.sh) minimize run-time of compute-heavy workloads. Feel free to adjust them for your particular use-cases and workloads.
+The provided [THP settings](thp-always.service.d/thp-always.sh) minimize run-time of memory-bound workloads. Feel free to adjust them for your particular use-cases and workloads.
 
-All the settings cannot be set in the kernel command line and/or in sysctl configuration.
+Not all of the settings can be set via the kernel command line or sysctl.
 
 To apply the settings immediately run:
 ```bash
@@ -125,131 +135,54 @@ To apply the settings earliest while booting-up, install the systemd service (`W
 sudo ./install-thp-always.sh
 ```
 
-## Using thp-meminfo
-thp-meminfo reports accurate totals of physical RAM page frames used by the entire system.
-
-### thp-meminfo example output
-```bash
-./thp-meminfo.sh
-                  max_ptes_none:          64
-                max_ptes_shared:          64
-                  max_ptes_swap:           0
-           scan_sleep_millisecs:      79,000
-                  pages_to_scan:   2,097,152
-                     full_scans:       5,377
-                pages_collapsed:      18,832
-
-                       MemTotal: 131,820,396 kB
-                        MemFree:   6,306,408 kB
-                   MemAvailable:  96,734,056 kB
-                  AnonHugePages:   2,072,576 kB
-                 ShmemHugePages:      55,296 kB
-                 ShmemPmdMapped:       2,048 kB
-                  FileHugePages:           0 kB
-                  FilePmdMapped:           0 kB
-
-             nr_shmem_hugepages:          27
-              nr_file_hugepages:           0
-  nr_anon_transparent_hugepages:       1,012
-            pgdemote_khugepaged:           0
-             pgsteal_khugepaged:       6,230
-              pgscan_khugepaged:       6,230
-          numa_huge_pte_updates:       1,068
-          thp_migration_success:      10,574
-             thp_migration_fail:           0
-            thp_migration_split:           0
-                thp_fault_alloc:     455,942
-             thp_fault_fallback:           0
-      thp_fault_fallback_charge:           0
-             thp_collapse_alloc:      16,558
-      thp_collapse_alloc_failed:           2
-                 thp_file_alloc:          33
-              thp_file_fallback:           0
-       thp_file_fallback_charge:           0
-                thp_file_mapped:         120
-                 thp_split_page:           0
-          thp_split_page_failed:           0
-        thp_deferred_split_page:      15,666
-                  thp_split_pmd:      21,132
-       thp_scan_exceed_none_pte:   1,673,921
-       thp_scan_exceed_swap_pte:           0
-      thp_scan_exceed_share_pte:      10,614
-                  thp_split_pud:           0
-            thp_zero_page_alloc:           1
-     thp_zero_page_alloc_failed:           0
-                     thp_swpout:           0
-            thp_swpout_fallback:           0
-```
-
-`thp_fault_alloc` counts immediately allocated THP.
-
-`thp_fault_fallback` counts failures to allocate THP immediately.
-
-`thp_collapse_alloc` counts THP collapsed by `khugepaged` at some later indeterminate time.
-
-The ideal is to maximize `thp_fault_alloc` and minimize `thp_collapse_alloc`.
-
-The extreme ideal is for `thp_fault_fallback` to stay at 0. It means that synchronous compaction enabled by `defrag=always` has never failed to produce a huge page at allocation time. Which is strong empirical evidence that `defrag=always` works well in your environment.
-
-In the above output, non-zero `thp_file_alloc` and `thp_file_mapped` come from `tmpfs` mounted into `/tmp` with extra `huge=within_size` mount option added into `/etc/fstab` for `/tmp` mount point.
-
-## Using thp-usage
-thp-usage reports what processes use how many transparent huge page frames of RAM. Reading these metrics from /proc/*/smaps of all processes is what requires the root privilege.
-
-The totals row is a simple sum of per-process metrics. Same THP page frames of RAM shared by multiple processes get summed more than once.
-
-### thp-usage example output
-My use case is machine learning using Ray Tune and PyTorch on CPU, and above change results in 5-15% faster machine learning with no code changes. Your results may differ, benchmark your application before and after applying the above change.
-
-
-```bash
-sudo ./thp-usage.py
-    pid	   pages	          MB	cmdline
- 712676	   1,268	       2,536	ray::ImplicitFunc.train_buffered()
- 711989	   1,070	       2,140	ray::ImplicitFunc.train_buffered()
- 714214	   1,068	       2,136	ray::ImplicitFunc.train_buffered()
- 712422	   1,064	       2,128	ray::ImplicitFunc.train_buffered()
- 713737	   1,064	       2,128	ray::ImplicitFunc.train_buffered()
- 711327	     864	       1,728	ray::ImplicitFunc.train_buffered()
-    ...	     ...	         ...	... (25 more ray workers, influxd, plasmashell, etc.)
- 704865	       1	           2	emacs
-      0	  24,884	      49,768	<total>
-```
-
 ## Using thp-benchmark
 
-The provided benchmark compares timings of benchmark runs using default THP settings vs compute-heavy THP settings.
+The provided benchmark compares timings of benchmark runs using default THP settings vs memory-bound THP settings. It requires (Ubuntu) packages `coreutils`, `sed`, `gawk`, `stress-ng`, `icdiff` to have been installed:
 
-The benchmark requires (Ubuntu) packages `coreutils`, `sed`, `stress-ng`, `icdiff` to have been installed:
-```
-sudo apt install coreutils sed stress-ng icdiff
+```bash
+sudo apt install coreutils gawk sed stress-ng icdiff
 ```
 
-With the default settings, it times running 2,000 iterations of `stress-ng --matrix` memory-bound methods `copy` `negate`, `mult`, `add`, `mean` on `double[1024][1024]` (8MiB array) matrices using 1 CPU. Benchmarking using more than 1 CPU introduces noise of CPU contention delays into timings. For this reason, the benchmark defaults to using 1 CPU.
+With the default settings, it times running 2000 iterations of `stress-ng --matrix` memory-bound methods `copy` `negate`, `mult`, `add`, `mean` on `double[1024][1024]` (8MiB array) matrices using 1 CPU.
 
-Takes ~3 seconds to run the benchmark with its default settings:
-```
+Benchmarking using more than 1 CPU introduces noise of CPU contention delays into timings. For this reason, the benchmark defaults to using 1 CPU.
+
+Low-power laptop CPUs cannot sustain running at maximum CPU frequency for more than a dozen of seconds before overheating and downclocking. Such CPUs also have smaller capacity of CPU data caches and TLB caches.
+
+For these reasons, the benchmark takes ~3 seconds to run with default settings.
+
+```bash
 ./thp-benchmark.sh
 ```
 
 Settings are configurable with environment variables, e.g.:
+```bash
+n_cpus=2 cpu_step=1 cpu_list=5,7 size=2048 n_ops=100 v=1 log_dir=/tmp/another-thp-benchmark ./thp-benchmark.sh
 ```
-n_cpus=8 n_ops=500 cpu_step=1 log_dir=/tmp/another-thp-benchmark ./thp-benchmark.sh
-```
+
+`n_cpus` sets the number of CPUs used for benchmarking, default is 1.
 
 `cpu_step=1` pins benchmark threads to CPUs in [0, n_cpus) range. Default `cpu_step=2` pins benchmark threads to every 2nd CPU in [0, n_cpus*2) range. This parameter prevents pinning 2 benchmark threads onto 2 SMT vCPUs sharing one CPU core. The correct value depends on the CPU topology, and it is the one that minimizes run-time when benchmarking using more than one CPU.
 
-Enabling the compute-heavy THP settings should result in orders of magnitude reduction in "Cache DTLB Read Miss" metric relative to default THP settings.
+`cpu_list` allows specifying CPUs to run on directly, overrides `cpu_step`.
+
+`size` sets matrix dimensions to `double[size][size]`. The default `size=1024` sets matrix dimensions to `double[1024][1024]`.
+
+`n_ops` sets the number of operations/iterations a benchmark performs, default is `n_ops=2000`.
+
+`v=1` enables the verbose full benchmark metric comparison output.
+
+Enabling the memory-bound THP settings should result in orders of magnitude reduction in "Cache DTLB Read Miss" metric relative to default THP settings.
 
 ### thp-benchmark example output
 
-On AMD Ryzen 5825U (25W laptop CPU) running with `mitigations=off` kernel option, enabling the compute-heavy THP settings does reduce "Cache DTLB Read Miss" count by orders of magnitude, as expected. That improves the run-time ("bogo ops/s (real time)" metric) of the benchmark methods by 5-45%:
+On AMD Ryzen 5825U (25W laptop CPU) running with `mitigations=off` kernel option, enabling the memory-bound THP settings does reduce "Cache DTLB Read Miss" count by orders of magnitude, as expected. That improves the run-time ("bogo ops/s (real time)" metric) of the benchmark methods by 5-45%:
 
 * **+11% speedup in `copy`**. `copy` does one load followed by one store.
 * **+8% speedup in `negate`**. `negate` does one load followed by negation and one store. `negate` is `copy` with an extra `xor` instruction which flips the sign bit (loads with xor instruction, normally). The cost of the extra `xor` instruction with 1-cycle latency is unaffected by THP settings, hence smaller speedup relative to `copy`,
 * **+5% speedup in `mult`**. `mult` does one load followed by multiplication and one store. `mult` is `negate` with a 3-cycle latency `mul` instruction instead of `xor`, hence smaller speedup relative to `negate`.
 * **+39% speedup in `add`**. `add` does two loads followed by addition and one store. `add` is similar to `mult` with an additional load. Making 3 out of 4 operations (2 loads, 1 add, 1 store; loads with add instruction, normally) faster delivers greater speedup.
-* **+45% speedup in `mean`**.`mean` does two loads of row elements of 2 matrices, and one store per row -- 1024× fewer stores relative to `add`. Hence, greater speedup relative to `add`.
+* **+45% speedup in `mean`**. `mean` does two loads of row elements of 2 matrices, and one store per row -- 1024× fewer stores relative to `add`. Hence, greater speedup relative to `add`.
 
 Summary of key metrics (AMD Ryzen 5825U, `mitigations=off`):
 
@@ -493,6 +426,95 @@ successful run completed in 0.35 secs                                           
 
 </details>
 
+## Using thp-meminfo
+thp-meminfo reports accurate totals of physical RAM page frames used by the entire system.
+
+### thp-meminfo example output
+```bash
+./thp-meminfo.sh
+                  max_ptes_none:          64
+                max_ptes_shared:          64
+                  max_ptes_swap:           0
+           scan_sleep_millisecs:      79,000
+                  pages_to_scan:   2,097,152
+                     full_scans:       5,377
+                pages_collapsed:      18,832
+
+                       MemTotal: 131,820,396 kB
+                        MemFree:   6,306,408 kB
+                   MemAvailable:  96,734,056 kB
+                  AnonHugePages:   2,072,576 kB
+                 ShmemHugePages:      55,296 kB
+                 ShmemPmdMapped:       2,048 kB
+                  FileHugePages:           0 kB
+                  FilePmdMapped:           0 kB
+
+             nr_shmem_hugepages:          27
+              nr_file_hugepages:           0
+  nr_anon_transparent_hugepages:       1,012
+            pgdemote_khugepaged:           0
+             pgsteal_khugepaged:       6,230
+              pgscan_khugepaged:       6,230
+          numa_huge_pte_updates:       1,068
+          thp_migration_success:      10,574
+             thp_migration_fail:           0
+            thp_migration_split:           0
+                thp_fault_alloc:     455,942
+             thp_fault_fallback:           0
+      thp_fault_fallback_charge:           0
+             thp_collapse_alloc:      16,558
+      thp_collapse_alloc_failed:           2
+                 thp_file_alloc:          33
+              thp_file_fallback:           0
+       thp_file_fallback_charge:           0
+                thp_file_mapped:         120
+                 thp_split_page:           0
+          thp_split_page_failed:           0
+        thp_deferred_split_page:      15,666
+                  thp_split_pmd:      21,132
+       thp_scan_exceed_none_pte:   1,673,921
+       thp_scan_exceed_swap_pte:           0
+      thp_scan_exceed_share_pte:      10,614
+                  thp_split_pud:           0
+            thp_zero_page_alloc:           1
+     thp_zero_page_alloc_failed:           0
+                     thp_swpout:           0
+            thp_swpout_fallback:           0
+```
+
+`thp_fault_alloc` counts immediately allocated THP.
+
+`thp_fault_fallback` counts failures to allocate THP immediately.
+
+`thp_collapse_alloc` counts THP collapsed by `khugepaged` at some later indeterminate time.
+
+The ideal is to maximize `thp_fault_alloc` and minimize `thp_collapse_alloc`.
+
+The extreme ideal is for `thp_fault_fallback` to stay at 0. It means that synchronous compaction enabled by `defrag=always` has never failed to produce a huge page at allocation time. Which is strong empirical evidence that `defrag=always` works well in your environment.
+
+In the above output, non-zero `thp_file_alloc` and `thp_file_mapped` come from `tmpfs` mounted into `/tmp` with extra `huge=within_size` mount option added into `/etc/fstab` for `/tmp` mount point.
+
+## Using thp-usage
+thp-usage reports what processes use how many transparent huge page frames of RAM. Reading these metrics from /proc/*/smaps of all processes is what requires the root privilege.
+
+The totals row is a simple sum of per-process metrics. Same THP page frames of RAM shared by multiple processes get summed more than once.
+
+### thp-usage example output
+My use case is machine learning using Ray Tune and PyTorch on CPU, and above change results in 5-15% faster machine learning with no code changes. Your results may differ, benchmark your application before and after applying the above change.
+
+```bash
+sudo ./thp-usage.py
+    pid	   pages	          MB	cmdline
+ 712676	   1,268	       2,536	ray::ImplicitFunc.train_buffered()
+ 711989	   1,070	       2,140	ray::ImplicitFunc.train_buffered()
+ 714214	   1,068	       2,136	ray::ImplicitFunc.train_buffered()
+ 712422	   1,064	       2,128	ray::ImplicitFunc.train_buffered()
+ 713737	   1,064	       2,128	ray::ImplicitFunc.train_buffered()
+ 711327	     864	       1,728	ray::ImplicitFunc.train_buffered()
+    ...	     ...	         ...	... (25 more ray workers, influxd, plasmashell, etc.)
+ 704865	       1	           2	emacs
+      0	  24,884	      49,768	<total>
+```
 
 ## Tips
 
@@ -545,7 +567,7 @@ _Instruction_ TLB (iTLB) misses in AOT-compiled machine code remain unaffected. 
 
 `perf stat` command can be used to report performance metrics along with TLB misses of one or multiple running processes.
 
-In the following example, running processes are filtered with `pgrep` by looking for "strat2" sub-string match in their full command lines, and, next, their metrics are collected for 60,000 milliseconds (1 minute). It filters 16 compute-heavy worker sub-processes doing linear algebra over subsets of one same 6GB dataset. The worker sub-processes bottleneck on loads missing the CPU caches and having to load from RAM, with `dTLB-load-misses` aggravating the cost of missing the CPU caches manyfold.
+In the following example, running processes are filtered with `pgrep` by looking for "strat2" sub-string match in their full command lines, and, next, their metrics are collected for 60,000 milliseconds (1 minute). It filters 16 memory-bound compute-heavy worker sub-processes doing linear algebra over subsets of one same 6GB dataset. The worker sub-processes bottleneck on loads missing the CPU caches and having to load from RAM, with `dTLB-load-misses` aggravating the cost of missing the CPU caches manyfold.
 
 ```bash
 perf stat --timeout 60000 -dd -p $(pgrep -d, -f strat2)
