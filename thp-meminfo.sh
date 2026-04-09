@@ -3,6 +3,9 @@
 function thp-meminfo {
     local name unit count
 
+    for name in enabled defrag; do
+        printf "%31s: %s\n" "$name" "$(cat /sys/kernel/mm/transparent_hugepage/$name)"
+    done
     for name in max_ptes_none max_ptes_shared max_ptes_swap scan_sleep_millisecs pages_to_scan full_scans pages_collapsed; do
         printf "%31s: %'11d\n" "$name" "$(cat /sys/kernel/mm/transparent_hugepage/khugepaged/$name)"
     done
